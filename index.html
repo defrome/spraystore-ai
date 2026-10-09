@@ -1,0 +1,817 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>SprayStore — Чат поддержки</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --yellow: #FFD60A;
+    --yellow-deep: #F5C400;
+    --ink: #121212;
+    --ink-2: #1C1C1C;
+    --ink-3: #2A2A2A;
+    --paper: #F6F5F2;
+    --white: #FFFFFF;
+    --muted: #8A8A8A;
+    --line: #ECEAE5;
+    --green: #2BD46B;
+    --radius: 18px;
+    --shadow: 0 30px 80px -20px rgba(0,0,0,.35), 0 10px 30px -10px rgba(0,0,0,.2);
+    --ease: cubic-bezier(.2,.8,.2,1);
+    --spring: cubic-bezier(.34,1.56,.64,1);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; overflow: hidden; }
+  body {
+    font-family: Manrope, system-ui, -apple-system, sans-serif;
+    background: var(--paper);
+    color: var(--ink);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ---------- Panel ---------- */
+  /* Колонка контента: на широком iframe центрируется, на узком — во всю ширину */
+  .ss-chat {
+    --col: 760px;
+    --gutter: max(16px, calc((100% - var(--col)) / 2));
+    position: fixed; inset: 0; display: flex; flex-direction: column;
+    background: var(--paper); animation: pageIn .6s var(--ease) both;
+  }
+
+  .ss-head {
+    position: relative; background: var(--ink); color: #fff; padding: 16px var(--gutter);
+    display: flex; align-items: center; gap: 12px; overflow: hidden;
+  }
+  .ss-head::before {
+    content: ""; position: absolute; right: -60px; top: -80px; width: 220px; height: 220px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(255,214,10,.35), transparent 65%);
+    filter: blur(10px); animation: drift 9s ease-in-out infinite alternate; pointer-events: none;
+  }
+  .ss-avatar {
+    position: relative; flex: none; width: 42px; height: 42px; border-radius: 14px;
+    display: grid; place-items: center; font-weight: 800; font-size: 14px;
+    background: var(--yellow); color: var(--ink); transition: all .5s var(--ease);
+  }
+  .ss-avatar.op { background: #fff; border-radius: 50%; }
+  .ss-avatar .dot {
+    position: absolute; right: -2px; bottom: -2px; width: 12px; height: 12px; border-radius: 50%;
+    background: var(--green); border: 2px solid var(--ink);
+  }
+  .ss-title { flex: 1; min-width: 0; z-index: 1; }
+  .ss-title b { display: block; font-size: 15px; font-weight: 700; }
+  .ss-title small { font-size: 12px; color: #a3a3a3; display: block; margin-top: 2px; transition: opacity .3s; }
+  .ss-icon-btn {
+    z-index: 1; width: 34px; height: 34px; border-radius: 10px; border: 0; cursor: pointer;
+    background: rgba(255,255,255,.07); color: #fff; display: grid; place-items: center;
+    transition: background .2s, transform .2s;
+  }
+  .ss-icon-btn:hover { background: rgba(255,255,255,.15); }
+  .ss-icon-btn:active { transform: scale(.92); }
+  .ss-icon-btn[hidden] { display: none; }
+
+  /* ---------- Приветственный экран ---------- */
+  .ss-hero {
+    text-align: center; padding: clamp(16px, 6vh, 56px) 0 12px; overflow: hidden;
+    transition: opacity .4s var(--ease), transform .5s var(--ease), max-height .6s var(--ease), padding .6s var(--ease);
+    max-height: 900px;
+  }
+  .ss-hero.gone { opacity: 0; transform: translateY(-16px) scale(.98); max-height: 0; padding: 0; }
+  .ss-orb {
+    position: relative; width: 84px; height: 84px; margin: 0 auto 22px; border-radius: 28px;
+    background: var(--ink); display: grid; place-items: center; color: var(--yellow);
+    box-shadow: 0 20px 40px -18px rgba(0,0,0,.5); animation: float 5s ease-in-out infinite;
+  }
+  .ss-orb::before {
+    content: ""; position: absolute; inset: -18px; border-radius: 50%; z-index: -1;
+    background: radial-gradient(circle, rgba(255,214,10,.45), transparent 65%); filter: blur(12px);
+    animation: glow 4s ease-in-out infinite alternate;
+  }
+  .ss-orb .spark { position: absolute; width: 6px; height: 6px; border-radius: 50%; background: var(--yellow); opacity: 0; animation: spark 2.8s var(--ease) infinite; }
+  .ss-orb .spark:nth-child(2) { top: 18%; right: -14px; animation-delay: .4s; }
+  .ss-orb .spark:nth-child(3) { top: 52%; right: -22px; width: 4px; height: 4px; animation-delay: 1s; }
+  .ss-orb .spark:nth-child(4) { top: 32%; right: -30px; width: 3px; height: 3px; animation-delay: 1.6s; }
+  .ss-kicker { display: inline-flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: #9a7d00; }
+  .ss-kicker::before { content: ""; width: 22px; height: 2px; background: var(--yellow); }
+  .ss-hero h1 { margin-top: 10px; font-size: clamp(28px, 5vw, 44px); line-height: 1.05; font-weight: 800; letter-spacing: -.02em; }
+  .ss-hero h1 span { background: linear-gradient(transparent 62%, var(--yellow) 62%); padding: 0 4px; }
+  .ss-hero p { margin: 12px auto 0; max-width: 420px; color: #6f6c66; font-size: 14.5px; line-height: 1.55; }
+  .ss-starters { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 28px; text-align: left; }
+  .starter {
+    display: flex; align-items: center; gap: 12px; border: 1px solid var(--line); background: #fff; border-radius: 16px;
+    padding: 14px; font: inherit; cursor: pointer; color: var(--ink); text-align: left;
+    transition: transform .3s var(--spring), border-color .2s, box-shadow .3s;
+    animation: msgIn .6s var(--spring) both;
+  }
+  .starter:nth-child(1) { animation-delay: .15s; } .starter:nth-child(2) { animation-delay: .22s; }
+  .starter:nth-child(3) { animation-delay: .29s; } .starter:nth-child(4) { animation-delay: .36s; }
+  .starter:hover { transform: translateY(-3px); border-color: var(--ink); box-shadow: 0 14px 30px -18px rgba(0,0,0,.35); }
+  .starter .ic { flex: none; width: 38px; height: 38px; border-radius: 12px; background: var(--paper); display: grid; place-items: center; font-size: 18px; transition: background .2s; }
+  .starter:hover .ic { background: var(--yellow); }
+  .starter b { display: block; font-size: 13.5px; font-weight: 700; }
+  .starter small { display: block; font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+  .ss-mode-bar {
+    height: 3px; background: var(--ink-3); position: relative; overflow: hidden;
+  }
+  .ss-mode-bar::after {
+    content: ""; position: absolute; inset: 0; width: 0; background: var(--yellow); transition: width .6s var(--ease);
+  }
+  .ss-chat[data-mode="connecting"] .ss-mode-bar::after { width: 40%; animation: loadbar 1.4s var(--ease) infinite; }
+  .ss-chat[data-mode="operator"] .ss-mode-bar::after { width: 100%; background: var(--green); }
+
+  .ss-body {
+    flex: 1; overflow-y: auto; padding: 24px var(--gutter) 8px; background: var(--paper);
+    scroll-behavior: smooth; overscroll-behavior: contain;
+  }
+  .ss-body::-webkit-scrollbar { width: 6px; }
+  .ss-body::-webkit-scrollbar-thumb { background: #dcd9d2; border-radius: 3px; }
+
+  .ss-day { text-align: center; font-size: 11px; color: var(--muted); letter-spacing: .08em; text-transform: uppercase; margin: 4px 0 16px; }
+
+  .msg { display: flex; gap: 8px; margin-bottom: 10px; align-items: flex-end; animation: msgIn .45s var(--spring) both; }
+  .msg .ava {
+    flex: none; width: 26px; height: 26px; border-radius: 9px; font-size: 10px; font-weight: 800;
+    display: grid; place-items: center; background: var(--ink); color: var(--yellow);
+  }
+  .msg.op .ava { background: #fff; color: var(--ink); border-radius: 50%; border: 1px solid var(--line); }
+  .msg .ava.ghost { visibility: hidden; }
+  .bubble {
+    max-width: 78%; padding: 11px 14px; font-size: 14px; line-height: 1.5;
+    background: #fff; border-radius: 16px 16px 16px 6px; border: 1px solid var(--line);
+    word-wrap: break-word;
+  }
+  .bubble b { font-weight: 700; }
+  .bubble .meta { display: block; font-size: 10.5px; color: var(--muted); margin-top: 4px; }
+  .msg.user { justify-content: flex-end; }
+  .msg.user .bubble { background: var(--ink); color: #fff; border-color: var(--ink); border-radius: 16px 16px 6px 16px; }
+  .msg.user .bubble .meta { color: #8c8c8c; text-align: right; }
+
+  .sys {
+    display: flex; align-items: center; gap: 10px; margin: 14px 0; font-size: 12px; color: var(--muted);
+    animation: msgIn .45s var(--ease) both;
+  }
+  .sys::before, .sys::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+
+  /* typing */
+  .typing .bubble { display: flex; gap: 4px; padding: 14px 16px; }
+  .typing .bubble i { width: 7px; height: 7px; border-radius: 50%; background: #c9c5bb; animation: bounce 1.2s infinite; }
+  .typing .bubble i:nth-child(2) { animation-delay: .15s; }
+  .typing .bubble i:nth-child(3) { animation-delay: .3s; }
+
+  /* Quick replies */
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 12px 34px; animation: msgIn .5s var(--ease) both; }
+  .chip {
+    border: 1px solid var(--line); background: #fff; color: var(--ink); font: inherit; font-size: 13px; font-weight: 600;
+    padding: 8px 12px; border-radius: 999px; cursor: pointer; transition: all .2s var(--ease);
+  }
+  .chip:hover { border-color: var(--ink); transform: translateY(-1px); }
+  .chip.used { opacity: .4; pointer-events: none; }
+
+  /* Product cards */
+  .cards { display: flex; gap: 8px; overflow-x: auto; margin: 0 0 12px 34px; padding-bottom: 4px; scroll-snap-type: x mandatory; animation: msgIn .5s var(--ease) both; }
+  .cards::-webkit-scrollbar { height: 0; }
+  .pcard {
+    flex: none; width: 168px; background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 12px;
+    scroll-snap-align: start; transition: transform .25s var(--ease), border-color .2s; cursor: pointer; text-decoration: none; color: inherit;
+  }
+  .pcard:hover { transform: translateY(-3px); border-color: var(--ink); }
+  .pcard .img { height: 76px; border-radius: 10px; background: linear-gradient(135deg, #fff8d6, #f3efe3); display: grid; place-items: center; font-size: 30px; margin-bottom: 10px; }
+  .pcard .n { font-size: 12.5px; font-weight: 700; line-height: 1.3; min-height: 32px; }
+  .pcard .p { margin-top: 6px; display: flex; justify-content: space-between; align-items: center; font-size: 13px; font-weight: 800; }
+  .pcard .p span { width: 24px; height: 24px; border-radius: 7px; background: var(--yellow); display: grid; place-items: center; font-size: 12px; }
+
+  /* Handoff card */
+  .handoff {
+    margin: 6px 0 14px 34px; background: var(--ink); color: #fff; border-radius: 18px; padding: 16px;
+    position: relative; overflow: hidden; animation: popIn .6s var(--spring) both;
+  }
+  .handoff::before {
+    content: ""; position: absolute; inset: -1px; border-radius: inherit; padding: 1px;
+    background: linear-gradient(120deg, transparent 20%, var(--yellow), transparent 80%);
+    background-size: 250% 100%; animation: shine 3s linear infinite;
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor; mask-composite: exclude; pointer-events: none;
+  }
+  .handoff .row { display: flex; gap: 12px; align-items: center; }
+  .handoff .faces { display: flex; }
+  .handoff .faces span {
+    width: 30px; height: 30px; border-radius: 50%; border: 2px solid var(--ink); margin-left: -8px;
+    display: grid; place-items: center; font-size: 11px; font-weight: 800; color: var(--ink);
+  }
+  .handoff .faces span:first-child { margin-left: 0; }
+  .handoff h4 { font-size: 14px; font-weight: 700; }
+  .handoff p { font-size: 12.5px; color: #a8a8a8; margin-top: 2px; line-height: 1.4; }
+  .handoff .actions { display: flex; gap: 8px; margin-top: 14px; }
+  .btn {
+    border: 0; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; border-radius: 10px; padding: 10px 14px;
+    transition: transform .2s var(--ease), background .2s, opacity .2s;
+  }
+  .btn:active { transform: scale(.96); }
+  .btn-yellow { background: var(--yellow); color: var(--ink); flex: 1; display: flex; align-items: center; justify-content: center; gap: 8px; }
+  .btn-yellow:hover { background: var(--yellow-deep); }
+  .btn-ghost { background: rgba(255,255,255,.08); color: #fff; }
+  .btn-ghost:hover { background: rgba(255,255,255,.15); }
+  .handoff.done .actions { opacity: .35; pointer-events: none; }
+
+  /* Connecting */
+  .connecting { display: flex; align-items: center; gap: 12px; margin: 10px 0 14px 34px; padding: 14px; background: #fff; border: 1px dashed #d9d5cb; border-radius: 16px; font-size: 13px; animation: msgIn .45s var(--ease) both; }
+  .spinner { width: 22px; height: 22px; border-radius: 50%; border: 2.5px solid #eee; border-top-color: var(--ink); animation: spin .8s linear infinite; flex: none; }
+  .connecting small { display: block; color: var(--muted); font-size: 12px; margin-top: 2px; }
+
+  /* Composer */
+  .ss-foot { background: #fff; border-top: 1px solid var(--line); padding: 12px var(--gutter) max(10px, env(safe-area-inset-bottom)); }
+  .composer {
+    display: flex; align-items: flex-end; gap: 8px; background: var(--paper); border: 1.5px solid transparent;
+    border-radius: 16px; padding: 6px 6px 6px 14px; transition: border-color .2s, background .2s;
+  }
+  .composer:focus-within { border-color: var(--ink); background: #fff; }
+  .composer textarea {
+    flex: 1; border: 0; outline: 0; resize: none; background: transparent; font: inherit; font-size: 14px;
+    line-height: 1.45; padding: 8px 0; max-height: 120px; color: var(--ink);
+  }
+  .composer textarea::placeholder { color: #a5a29b; }
+  .send {
+    flex: none; width: 38px; height: 38px; border-radius: 12px; border: 0; cursor: pointer;
+    background: var(--ink); color: var(--yellow); display: grid; place-items: center;
+    transition: transform .25s var(--spring), opacity .2s, background .2s;
+  }
+  .send:disabled { opacity: .25; cursor: default; }
+  .send:not(:disabled):hover { transform: scale(1.06) rotate(-8deg); }
+  .ss-hint { display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: #a5a29b; margin-top: 8px; padding: 0 4px; }
+  .ss-hint button { border: 0; background: none; font: inherit; color: var(--ink); font-weight: 700; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+
+  /* ---------- Animations ---------- */
+  @keyframes pageIn { from { opacity: 0; } }
+  @keyframes float { 50% { transform: translateY(-6px) rotate(-2deg); } }
+  @keyframes glow { to { transform: scale(1.2); opacity: .7; } }
+  @keyframes spark { 0% { opacity: 0; transform: translateX(-10px); } 30% { opacity: 1; } 100% { opacity: 0; transform: translateX(16px); } }
+  @keyframes msgIn { from { opacity: 0; transform: translateY(10px) scale(.98); } }
+  @keyframes popIn { from { opacity: 0; transform: translateY(14px) scale(.94); } }
+  @keyframes bounce { 0%, 60%, 100% { transform: translateY(0); opacity: .5; } 30% { transform: translateY(-5px); opacity: 1; } }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @keyframes drift { to { transform: translate(-40px, 30px) scale(1.15); } }
+  @keyframes shine { to { background-position: -250% 0; } }
+  @keyframes loadbar { 0% { transform: translateX(-100%); } 100% { transform: translateX(250%); } }
+
+  @media (max-width: 480px) {
+    .ss-starters { grid-template-columns: 1fr; }
+    .chips, .cards, .handoff, .connecting { margin-left: 0; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+  }
+</style>
+</head>
+<body>
+
+<!-- SprayStore Chat — страница предназначена для встраивания через <iframe> -->
+<div id="ss-widget">
+  <main class="ss-chat" id="ssChat" data-mode="ai" aria-label="Чат поддержки SprayStore">
+    <header class="ss-head">
+      <div class="ss-avatar" id="ssAvatar">AI<span class="dot"></span></div>
+      <div class="ss-title">
+        <b id="ssName">ИИ-помощник SprayStore</b>
+        <small id="ssStatus">Отвечает мгновенно · 24/7</small>
+      </div>
+      <button class="ss-icon-btn" id="ssReset" title="Начать заново" aria-label="Начать заново">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>
+      </button>
+      <button class="ss-icon-btn" id="ssClose" title="Закрыть" aria-label="Закрыть" hidden>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+    </header>
+    <div class="ss-mode-bar"></div>
+
+    <div class="ss-body" id="ssBody" aria-live="polite"></div>
+
+    <footer class="ss-foot">
+      <form class="composer" id="ssForm">
+        <textarea id="ssInput" rows="1" placeholder="Напишите вопрос…" aria-label="Сообщение"></textarea>
+        <button class="send" id="ssSend" type="submit" disabled aria-label="Отправить">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        </button>
+      </form>
+      <div class="ss-hint">
+        <span id="ssHintText">ИИ может ошибаться</span>
+        <button type="button" id="ssHumanLink">Позвать человека</button>
+      </div>
+    </footer>
+  </main>
+</div>
+
+<script>
+(() => {
+  /* =====================================================================
+   *  КОНФИГ — точка расширения. Подключите реальные эндпоинты здесь.
+   * ===================================================================== */
+  const CONFIG = {
+    brand: 'SprayStore',
+    handoffAfter: 3,          // после скольких вопросов предложить живого специалиста
+    reofferEvery: 3,          // если отказались — повторно предложить через N вопросов
+    // Origin сайта-родителя для postMessage. '*' — любой; на проде укажите 'https://spraystore.ru'
+    parentOrigin: '*',
+    storageKey: 'ss_chat_v1',
+    ai: {
+      endpoint: null,         // напр. '/api/chat' — если null, работает мок
+      typingSpeed: [600, 1400]
+    },
+    operator: {
+      endpoint: null,         // напр. 'wss://support.spraystore.ru/ws' — если null, мок
+      name: 'Анна',
+      role: 'Специалист SprayStore',
+      initials: 'А'
+    },
+    links: {
+      telegram: 'https://t.me/',
+      catalog: '#catalog'
+    }
+  };
+
+  /* =====================================================================
+   *  ТРАНСПОРТ — заменить мок-реализации на реальные запросы.
+   * ===================================================================== */
+  const AIProvider = {
+    /** @returns {Promise<{text:string, chips?:string[], cards?:object[], confident?:boolean}>} */
+    async reply(text, history) {
+      if (CONFIG.ai.endpoint) {
+        const r = await fetch(CONFIG.ai.endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: text, history })
+        });
+        return r.json();
+      }
+      return MockAI.answer(text);
+    }
+  };
+
+  const OperatorProvider = {
+    listeners: [],
+    onMessage(fn) { this.listeners.push(fn); },
+    emit(msg) { this.listeners.forEach(fn => fn(msg)); },
+    /** Передаёт оператору историю диалога, чтобы клиенту не повторять вопрос */
+    async connect(history) {
+      if (CONFIG.operator.endpoint) {
+        // TODO: this.ws = new WebSocket(CONFIG.operator.endpoint);
+        //       this.ws.onmessage = e => this.emit(JSON.parse(e.data));
+        //       this.ws.onopen = () => this.ws.send(JSON.stringify({ type:'handoff', history }));
+      }
+      await wait(2600 + Math.random() * 1200);
+      return { name: CONFIG.operator.name, role: CONFIG.operator.role, initials: CONFIG.operator.initials };
+    },
+    async send(text) {
+      if (this.ws) return this.ws.send(JSON.stringify({ type: 'message', text }));
+      // мок ответа оператора
+      await wait(1800 + Math.random() * 1500);
+      this.emit({ text: MockOperator.answer(text) });
+    }
+  };
+
+  /* =====================================================================
+   *  МОК-БАЗА ЗНАНИЙ
+   * ===================================================================== */
+  const PRODUCTS = {
+    flexio: { name: 'Wagner FLEXiO 590', price: '12 990 ₽', icon: '🔫' },
+    w100:   { name: 'Wagner W 100', price: '6 490 ₽', icon: '🎨' },
+    xvlp:   { name: 'Wagner XVLP 1250', price: '18 990 ₽', icon: '💨' },
+    ctrl:   { name: 'Wagner Control Pro 250M', price: '64 900 ₽', icon: '⚙️' },
+    hg:     { name: 'Фен Wagner Furno 500', price: '4 790 ₽', icon: '🔥' }
+  };
+
+  const INTENTS = [
+    { re: /(привет|здравств|добр(ый|ое)|хай|hello)/i,
+      text: 'Привет! Я помогу подобрать оборудование, расскажу про доставку, оплату и гарантию. Что красим?',
+      chips: ['Стены в квартире', 'Забор / фасад', 'Мебель и двери'] },
+    { re: /(подобрать|выбрать|подбор|какой краскопульт|^краскопульт)/i,
+      text: 'С удовольствием! Подскажите, что планируете красить — от этого зависит тип аппарата и насадка.',
+      chips: ['Стены в квартире', 'Забор / фасад', 'Мебель и двери'] },
+    { re: /(стен|потол|квартир|интерьер|комнат)/i,
+      text: 'Для стен и потолков лучше всего подойдёт краскопульт с насадкой для водоэмульсионных красок. Обратите внимание на **FLEXiO 590** — две насадки в комплекте, ровный факел без брызг. Для больших объёмов (от 100 м²) — безвоздушный **Control Pro 250M**.',
+      cards: ['flexio', 'ctrl'], chips: ['А что дешевле?', 'Какую краску брать?'] },
+    { re: /(забор|фасад|улиц|дом|дач|сарай)/i,
+      text: 'Для фасадов и заборов важна производительность. Рекомендую **XVLP 1250** — справится с антисептиками, лаками и фасадными красками. Для штакетника отлично подходит узкий вертикальный факел.',
+      cards: ['xvlp', 'flexio'], chips: ['Сколько краски уйдёт?', 'Есть доставка?'] },
+    { re: /(мебел|двер|шкаф|лак|дерев|морил)/i,
+      text: 'Для мебели и дверей нужна тонкая настройка факела. **W 100** — лёгкий и точный, идеален для лаков, морилок и масел. Совет: разбавляйте лак на 5–10% и держите пистолет в 20–25 см от поверхности.',
+      cards: ['w100', 'flexio'], chips: ['Как разбавлять краску?', 'Гарантия?'] },
+    { re: /(дешев|бюджет|недорог|цена|стоим|сколько стоит)/i,
+      text: 'Самый доступный вариант — **W 100** за 6 490 ₽. И не забудьте промокод **HELLO** — −10% на первый заказ 🎁',
+      cards: ['w100'], chips: ['Как применить промокод?'] },
+    { re: /(промокод|скидк|hello|акци)/i,
+      text: 'Промокод **HELLO** даёт −10% на первый заказ. Введите его в корзине в поле «Промокод» перед оформлением.',
+      chips: ['Как оплатить?', 'Доставка'] },
+    { re: /(достав|привез|курьер|самовывоз|сдэк|почт)/i,
+      text: 'Доставляем по всей России: курьером, СДЭК и в пункты выдачи. По Москве — 1–2 дня, в регионы — 2–7 дней. Также можно купить нас на **Ozon**.',
+      chips: ['Сколько стоит доставка?', 'Как оплатить?'] },
+    { re: /(оплат|карт|налич|рассроч|счет|счёт|юр)/i,
+      text: 'Оплатить можно картой онлайн, через СБП или при получении. Для юрлиц выставляем счёт с НДС.',
+      chips: ['Гарантия?', 'Доставка'] },
+    { re: /(гаранти|сломал|ремонт|сервис|не работ|возврат|брак)/i,
+      text: 'На всё оборудование Wagner — официальная гарантия от 1 года. Если что-то не работает, лучше сразу разобраться со специалистом: он оформит сервис или замену.',
+      chips: ['Связаться со специалистом'], forceHandoff: true },
+    { re: /(разбав|вязк|какую краск|краску брать|сопл|насадк|форсунк)/i,
+      text: 'Проверьте вязкость воронкой из комплекта: для водоэмульсии — 25–35 сек, для лаков — 15–20 сек. Разбавляйте постепенно, по 5%, водой или растворителем по типу краски.',
+      chips: ['А для фасада?', 'Позвать специалиста'] },
+    { re: /(расход|сколько краски|литр|м2|м²|квадрат)/i,
+      text: 'Ориентир — 1 литр на 6–10 м² в один слой, зависит от фактуры. Напишите площадь, и я прикину точнее.',
+      chips: ['30 м²', '80 м²', '150 м²'] },
+    { re: /(\d+)\s*(м2|м²|кв|метр)/i,
+      fn: m => { const s = +m[1]; const min = Math.ceil(s / 10 * 2), max = Math.ceil(s / 6 * 2);
+        return { text: `Для **${s} м²** в два слоя понадобится примерно **${min}–${max} л** краски. ${s > 100 ? 'При таком объёме стоит присмотреться к безвоздушному аппарату — сэкономите часы работы.' : 'Ручного краскопульта будет достаточно.'}`,
+                 cards: s > 100 ? ['ctrl'] : ['flexio'] }; } },
+    { re: /(фен|строительн|снять краск)/i,
+      text: 'Строительный фен пригодится для снятия старой краски и сушки. Хорошо зарекомендовал себя **Furno 500**.',
+      cards: ['hg'] },
+    { re: /(ozon|озон|маркетплейс)/i,
+      text: 'Да, мы есть на Ozon — ищите магазин SprayStore. Но на сайте действует промокод HELLO 😉' },
+    { re: /(спасиб|благодар|отлично|супер)/i,
+      text: 'Рад помочь! Если появятся вопросы — я здесь 🙌' }
+  ];
+
+  const MockAI = {
+    answer(text) {
+      for (const it of INTENTS) {
+        const m = text.match(it.re);
+        if (m) return { confident: true, ...(it.fn ? it.fn(m) : it) };
+      }
+      return {
+        confident: false,
+        text: 'Хороший вопрос! Точно ответить не могу — возможно, это лучше уточнить у специалиста. Могу пока подсказать по выбору, доставке или оплате.',
+        chips: ['Подобрать краскопульт', 'Доставка', 'Позвать специалиста']
+      };
+    }
+  };
+
+  const MockOperator = {
+    i: 0,
+    answer() {
+      const r = [
+        'Поняла вас. Сейчас уточню наличие на складе, буквально минуту 🙂',
+        'Да, всё в наличии. Могу оформить заказ прямо здесь или отправить ссылку на корзину с уже применённой скидкой.',
+        'Записала. Если удобнее — продублирую информацию в Telegram или на почту.',
+        'Хорошо! Если что-то ещё понадобится — пишите, я на связи.'
+      ];
+      return r[this.i++ % r.length];
+    }
+  };
+
+  /* =====================================================================
+   *  СОСТОЯНИЕ
+   * ===================================================================== */
+  const state = {
+    open: false,
+    mode: 'ai',            // 'ai' | 'connecting' | 'operator'
+    userCount: 0,          // кол-во вопросов в режиме ИИ
+    lowConfidence: 0,      // сколько раз ИИ «не понял»
+    nextOfferAt: CONFIG.handoffAfter,
+    operator: null,
+    history: []            // {role, text, ts, extra?}
+  };
+
+  const $ = id => document.getElementById(id);
+  const el = { chat: $('ssChat'), body: $('ssBody'), input: $('ssInput'), send: $('ssSend'), form: $('ssForm'),
+    close: $('ssClose'), avatar: $('ssAvatar'),
+    name: $('ssName'), status: $('ssStatus'), hint: $('ssHintText'), humanLink: $('ssHumanLink') };
+
+  const wait = ms => new Promise(r => setTimeout(r, ms));
+  const rand = ([a, b]) => a + Math.random() * (b - a);
+  const time = ts => new Date(ts).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+  const esc = s => s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const md = s => esc(s).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/\n/g, '<br>');
+
+  /* ---------- Persist ---------- */
+  function save() {
+    try {
+      const { open, ...rest } = state;
+      localStorage.setItem(CONFIG.storageKey, JSON.stringify(rest));
+    } catch (e) {}
+  }
+  function load() {
+    try { const s = JSON.parse(localStorage.getItem(CONFIG.storageKey)); if (s && s.history) return s; } catch (e) {}
+    return null;
+  }
+
+  /* =====================================================================
+   *  РЕНДЕР
+   * ===================================================================== */
+  function scrollDown() { requestAnimationFrame(() => el.body.scrollTop = el.body.scrollHeight); }
+
+  function lastSender() {
+    const last = el.body.lastElementChild;
+    return last && last.classList.contains('msg') ? last.dataset.role : null;
+  }
+
+  function renderMessage({ role, text, ts }) {
+    if (role === 'system') {
+      const d = document.createElement('div');
+      d.className = 'sys'; d.textContent = text;
+      el.body.appendChild(d); return scrollDown();
+    }
+    const grouped = lastSender() === role;
+    const m = document.createElement('div');
+    m.className = 'msg ' + role;
+    m.dataset.role = role;
+    if (role !== 'user') {
+      const ava = document.createElement('div');
+      ava.className = 'ava';
+      ava.textContent = role === 'op' ? (state.operator?.initials || 'А') : 'AI';
+      // в серии сообщений аватар остаётся только у последнего
+      if (grouped) el.body.lastElementChild.querySelector('.ava')?.classList.add('ghost');
+      m.appendChild(ava);
+    }
+    const b = document.createElement('div');
+    b.className = 'bubble';
+    b.innerHTML = md(text) + `<span class="meta">${time(ts)}</span>`;
+    m.appendChild(b);
+    el.body.appendChild(m);
+    scrollDown();
+  }
+
+  function renderChips(chips) {
+    if (!chips?.length) return;
+    const wrap = document.createElement('div');
+    wrap.className = 'chips';
+    chips.forEach(c => {
+      const btn = document.createElement('button');
+      btn.className = 'chip'; btn.type = 'button'; btn.textContent = c;
+      btn.onclick = () => { wrap.querySelectorAll('.chip').forEach(x => x.classList.add('used')); submit(c); };
+      wrap.appendChild(btn);
+    });
+    el.body.appendChild(wrap); scrollDown();
+  }
+
+  function renderCards(ids) {
+    if (!ids?.length) return;
+    const wrap = document.createElement('div');
+    wrap.className = 'cards';
+    ids.map(id => PRODUCTS[id]).filter(Boolean).forEach(p => {
+      const a = document.createElement('a');
+      a.className = 'pcard'; a.href = CONFIG.links.catalog;
+      a.innerHTML = `<div class="img">${p.icon}</div><div class="n">${esc(p.name)}</div><div class="p">${p.price}<span>→</span></div>`;
+      wrap.appendChild(a);
+    });
+    el.body.appendChild(wrap); scrollDown();
+  }
+
+  function showTyping() {
+    const t = document.createElement('div');
+    t.className = 'msg typing ' + (state.mode === 'operator' ? 'op' : 'bot');
+    t.innerHTML = `<div class="ava">${state.mode === 'operator' ? state.operator.initials : 'AI'}</div><div class="bubble"><i></i><i></i><i></i></div>`;
+    el.body.appendChild(t); scrollDown();
+    return () => t.remove();
+  }
+
+  function renderHandoffOffer(reason) {
+    const card = document.createElement('div');
+    card.className = 'handoff';
+    card.innerHTML = `
+      <div class="row">
+        <div class="faces">
+          <span style="background:#FFD60A">А</span><span style="background:#fff">М</span><span style="background:#e9e5da">Д</span>
+        </div>
+        <div>
+          <h4>${reason === 'fail' ? 'Давайте подключу специалиста' : 'Хотите обсудить с живым специалистом?'}</h4>
+          <p>Продолжим прямо здесь — он увидит всю переписку. Среднее время ответа ~2 мин.</p>
+        </div>
+      </div>
+      <div class="actions">
+        <button class="btn btn-yellow" data-a="yes">Подключить
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        </button>
+        <button class="btn btn-ghost" data-a="no">Продолжить с ИИ</button>
+      </div>`;
+    emit('handoff_offer', { reason });
+    card.querySelector('[data-a="yes"]').onclick = () => { card.classList.add('done'); startHandoff(); };
+    card.querySelector('[data-a="no"]').onclick = () => {
+      card.classList.add('done');
+      state.nextOfferAt = state.userCount + CONFIG.reofferEvery;
+      botSay({ text: 'Хорошо, продолжаем! Кнопка «Позвать человека» всегда внизу 👇' });
+    };
+    el.body.appendChild(card); scrollDown();
+  }
+
+  function setMode(mode) {
+    state.mode = mode;
+    el.chat.dataset.mode = mode;
+    if (mode === 'ai') {
+      el.avatar.className = 'ss-avatar'; el.avatar.firstChild.nodeValue = 'AI';
+      el.name.textContent = `ИИ-помощник ${CONFIG.brand}`;
+      el.status.textContent = 'Отвечает мгновенно · 24/7';
+      el.hint.textContent = 'ИИ может ошибаться'; el.humanLink.hidden = false;
+    } else if (mode === 'connecting') {
+      el.status.textContent = 'Подключаем специалиста…';
+      el.humanLink.hidden = true;
+    } else if (mode === 'operator') {
+      el.avatar.className = 'ss-avatar op'; el.avatar.firstChild.nodeValue = state.operator.initials;
+      el.name.textContent = state.operator.name;
+      el.status.textContent = `${state.operator.role} · в чате`;
+      el.hint.textContent = 'Вы общаетесь с человеком'; el.humanLink.hidden = true;
+    }
+    el.input.placeholder = mode === 'connecting' ? 'Можно писать — специалист увидит…' : 'Напишите вопрос…';
+  }
+
+  /* =====================================================================
+   *  ЛОГИКА
+   * ===================================================================== */
+  function push(role, text, extra) {
+    const item = { role, text, ts: Date.now(), ...(extra || {}) };
+    state.history.push(item);
+    save();
+    return item;
+  }
+
+  function botSay(res) {
+    const item = push(state.mode === 'operator' ? 'op' : 'bot', res.text, { chips: res.chips, cards: res.cards });
+    renderMessage(item);
+    emit('message', { role: item.role, text: item.text });
+    renderCards(res.cards);
+    renderChips(res.chips);
+  }
+
+  const HUMAN_RE = /(оператор|человек|менеджер|специалист|живо|консультант)/i;
+
+  async function submit(raw) {
+    const text = raw.trim();
+    if (!text) return;
+    hideHero();
+    renderMessage(push('user', text));
+    emit('user_message', { text });
+
+    // В режиме специалиста сообщения уходят оператору (при подключении — просто копятся в истории)
+    if (state.mode === 'operator') return OperatorProvider.send(text);
+    if (state.mode === 'connecting') return;
+
+    // Явная просьба о человеке — сразу подключаем
+    if (HUMAN_RE.test(text)) return startHandoff();
+
+    state.userCount++;
+    const stop = showTyping();
+    let res;
+    try {
+      [res] = await Promise.all([AIProvider.reply(text, state.history), wait(rand(CONFIG.ai.typingSpeed))]);
+    } catch (e) {
+      res = { text: 'Похоже, связь прервалась. Давайте я подключу специалиста.', confident: false, forceHandoff: true };
+    }
+    stop();
+    botSay(res);
+    if (!res.confident) state.lowConfidence++;
+
+    // Предложение перейти на живую поддержку: после 3–4 вопросов, при двух «непониманиях» подряд или по теме
+    const shouldOffer = res.forceHandoff || state.lowConfidence >= 2 || state.userCount >= state.nextOfferAt;
+    if (shouldOffer) {
+      state.nextOfferAt = Infinity;
+      state.lowConfidence = 0;
+      await wait(700);
+      const t = showTyping(); await wait(900); t();
+      renderHandoffOffer(res.confident === false || res.forceHandoff ? 'fail' : 'count');
+    }
+    save();
+  }
+
+  async function startHandoff() {
+    if (state.mode !== 'ai') return;
+    setMode('connecting');
+    emit('handoff_start');
+    renderMessage(push('system', 'Переводим диалог на специалиста'));
+    const c = document.createElement('div');
+    c.className = 'connecting';
+    c.innerHTML = '<div class="spinner"></div><div><b>Ищем свободного специалиста</b><small>Передаём историю переписки — повторять ничего не нужно</small></div>';
+    el.body.appendChild(c); scrollDown();
+
+    state.operator = await OperatorProvider.connect(state.history);
+    c.remove();
+    setMode('operator');
+    renderMessage(push('system', `${state.operator.name} подключилась к чату`));
+    const t = showTyping(); await wait(1400); t();
+    const lastQ = [...state.history].reverse().find(h => h.role === 'user');
+    botSay({ text: `Здравствуйте! Меня зовут ${state.operator.name}, я специалист ${CONFIG.brand}. Вижу нашу переписку${lastQ ? ` — вы спрашивали «${lastQ.text.slice(0, 60)}»` : ''}. Сейчас помогу разобраться 🙂` });
+    emit('operator_joined', { operator: state.operator });
+    save();
+  }
+
+  OperatorProvider.onMessage(async msg => {
+    const t = showTyping(); await wait(900); t();
+    botSay(msg);
+  });
+
+  const STARTERS = [
+    { ic: '🎨', t: 'Подобрать краскопульт', s: 'Под стены, мебель или фасад', q: 'Подобрать краскопульт' },
+    { ic: '🏡', t: 'Покрасить забор', s: 'Что выбрать для улицы', q: 'Хочу покрасить забор' },
+    { ic: '🚚', t: 'Доставка и оплата', s: 'Сроки, способы, стоимость', q: 'Как работает доставка?' },
+    { ic: '🎁', t: 'Скидка −10%', s: 'Промокод на первый заказ', q: 'Расскажи про промокод HELLO' }
+  ];
+
+  function renderHero() {
+    const h = document.createElement('section');
+    h.className = 'ss-hero'; h.id = 'ssHero';
+    h.innerHTML = `
+      <div class="ss-orb">
+        <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12Z"/><path d="M8.5 12h.01M12 12h.01M15.5 12h.01"/></svg>
+        <i class="spark"></i><i class="spark"></i><i class="spark"></i>
+      </div>
+      <div class="ss-kicker">Поддержка ${esc(CONFIG.brand)}</div>
+      <h1>Чем могу <span>помочь?</span></h1>
+      <p>Подберу оборудование под вашу задачу, подскажу по доставке, оплате и гарантии. А если нужно — подключу живого специалиста.</p>
+      <div class="ss-starters">${STARTERS.map((x, i) => `
+        <button class="starter" type="button" data-i="${i}">
+          <span class="ic">${x.ic}</span><span><b>${esc(x.t)}</b><small>${esc(x.s)}</small></span>
+        </button>`).join('')}
+      </div>`;
+    h.querySelectorAll('.starter').forEach(b => b.onclick = () => submit(STARTERS[+b.dataset.i].q));
+    el.body.appendChild(h);
+  }
+
+  function hideHero() {
+    const h = $('ssHero');
+    if (!h || h.classList.contains('gone')) return;
+    h.classList.add('gone');
+    setTimeout(() => h.remove(), 600);
+    if (!el.body.querySelector('.ss-day')) {
+      const d = document.createElement('div'); d.className = 'ss-day'; d.textContent = 'Сегодня';
+      el.body.appendChild(d);
+    }
+  }
+
+  function restore(saved) {
+    Object.assign(state, saved);
+    if (state.mode === 'connecting') state.mode = 'ai';
+    const day = document.createElement('div'); day.className = 'ss-day'; day.textContent = 'Сегодня';
+    el.body.appendChild(day);
+    state.history.forEach(h => { renderMessage(h); });
+    const last = state.history[state.history.length - 1];
+    if (last?.chips) renderChips(last.chips);
+    setMode(state.mode);
+  }
+
+  function reset() {
+    try { localStorage.removeItem(CONFIG.storageKey); } catch (e) {}
+    Object.assign(state, { mode: 'ai', userCount: 0, lowConfidence: 0, nextOfferAt: CONFIG.handoffAfter, operator: null, history: [] });
+    el.body.innerHTML = '';
+    setMode('ai');
+    renderHero();
+    el.input.focus();
+  }
+
+  /* =====================================================================
+   *  СВЯЗЬ С САЙТОМ-РОДИТЕЛЕМ (iframe ⇄ postMessage)
+   *  Исходящие: ready, message, user_message, handoff_offer, handoff_start, operator_joined, close
+   *  Входящие:  { source: 'spraystore-host', type: 'send' | 'reset' | 'handoff' | 'focus', text? }
+   * ===================================================================== */
+  const embedded = window.self !== window.top;
+  function emit(type, data) {
+    if (!embedded) return;
+    try { window.parent.postMessage({ source: 'spraystore-chat', type, ...(data || {}) }, CONFIG.parentOrigin); } catch (e) {}
+  }
+  window.addEventListener('message', e => {
+    if (CONFIG.parentOrigin !== '*' && e.origin !== CONFIG.parentOrigin) return;
+    const d = e.data;
+    if (!d || d.source !== 'spraystore-host') return;
+    if (d.type === 'send' && d.text) submit(String(d.text));
+    else if (d.type === 'reset') reset();
+    else if (d.type === 'handoff') startHandoff();
+    else if (d.type === 'focus') el.input.focus();
+  });
+
+  /* ---------- Events ---------- */
+  el.close.hidden = !embedded;
+  el.close.onclick = () => emit('close');
+  $('ssReset').onclick = reset;
+  el.humanLink.onclick = () => { hideHero(); renderMessage(push('user', 'Позовите специалиста')); startHandoff(); };
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') emit('close'); });
+
+  el.input.addEventListener('input', () => {
+    el.send.disabled = !el.input.value.trim();
+    el.input.style.height = 'auto';
+    el.input.style.height = Math.min(el.input.scrollHeight, 120) + 'px';
+  });
+  el.input.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); el.form.requestSubmit(); }
+  });
+  el.form.addEventListener('submit', e => {
+    e.preventDefault();
+    const v = el.input.value;
+    el.input.value = ''; el.input.style.height = 'auto'; el.send.disabled = true;
+    submit(v);
+  });
+
+  /* ---------- Init ---------- */
+  const saved = load();
+  if (saved && saved.history.some(h => h.role === 'user')) restore(saved);
+  else { if (saved) state.history = []; renderHero(); }
+
+  // ?q=текст — сразу задать вопрос (удобно для кнопок «Спросить про товар» на сайте)
+  const q = new URLSearchParams(location.search).get('q');
+  if (q) submit(q);
+
+  emit('ready');
+
+  // Публичный API для интеграции с сайтом
+  window.SprayChat = { reset, send: submit, handoff: startHandoff, config: CONFIG, state };
+})();
+</script>
+</body>
+</html>
