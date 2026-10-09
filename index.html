@@ -42,37 +42,6 @@
     background: var(--paper); animation: pageIn .6s var(--ease) both;
   }
 
-  .ss-head {
-    position: relative; background: var(--ink); color: #fff; padding: 16px var(--gutter);
-    display: flex; align-items: center; gap: 12px; overflow: hidden;
-  }
-  .ss-head::before {
-    content: ""; position: absolute; right: -60px; top: -80px; width: 220px; height: 220px; border-radius: 50%;
-    background: radial-gradient(circle, rgba(255,214,10,.35), transparent 65%);
-    filter: blur(10px); animation: drift 9s ease-in-out infinite alternate; pointer-events: none;
-  }
-  .ss-avatar {
-    position: relative; flex: none; width: 42px; height: 42px; border-radius: 14px;
-    display: grid; place-items: center; font-weight: 800; font-size: 14px;
-    background: var(--yellow); color: var(--ink); transition: all .5s var(--ease);
-  }
-  .ss-avatar.op { background: #fff; border-radius: 50%; }
-  .ss-avatar .dot {
-    position: absolute; right: -2px; bottom: -2px; width: 12px; height: 12px; border-radius: 50%;
-    background: var(--green); border: 2px solid var(--ink);
-  }
-  .ss-title { flex: 1; min-width: 0; z-index: 1; }
-  .ss-title b { display: block; font-size: 15px; font-weight: 700; }
-  .ss-title small { font-size: 12px; color: #a3a3a3; display: block; margin-top: 2px; transition: opacity .3s; }
-  .ss-icon-btn {
-    z-index: 1; width: 34px; height: 34px; border-radius: 10px; border: 0; cursor: pointer;
-    background: rgba(255,255,255,.07); color: #fff; display: grid; place-items: center;
-    transition: background .2s, transform .2s;
-  }
-  .ss-icon-btn:hover { background: rgba(255,255,255,.15); }
-  .ss-icon-btn:active { transform: scale(.92); }
-  .ss-icon-btn[hidden] { display: none; }
-
   /* ---------- Приветственный экран ---------- */
   .ss-hero {
     text-align: center; padding: clamp(16px, 6vh, 56px) 0 12px; overflow: hidden;
@@ -115,7 +84,7 @@
   .starter small { display: block; font-size: 12px; color: var(--muted); margin-top: 2px; }
 
   .ss-mode-bar {
-    height: 3px; background: var(--ink-3); position: relative; overflow: hidden;
+    flex: none; height: 3px; background: transparent; position: relative; overflow: hidden;
   }
   .ss-mode-bar::after {
     content: ""; position: absolute; inset: 0; width: 0; background: var(--yellow); transition: width .6s var(--ease);
@@ -242,6 +211,13 @@
   .send:disabled { opacity: .25; cursor: default; }
   .send:not(:disabled):hover { transform: scale(1.06) rotate(-8deg); }
   .ss-hint { display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: #a5a29b; margin-top: 8px; padding: 0 4px; }
+  .ss-hint .dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--yellow); margin-right: 6px; vertical-align: 1px; transition: background .3s; }
+  .ss-chat[data-mode="operator"] .ss-hint .dot { background: var(--green); }
+  .ss-hint > span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-right: 10px; }
+  .ss-hint .acts { display: flex; gap: 12px; flex: none; }
+  .ss-hint #ssReset { text-decoration: none; display: grid; place-items: center; opacity: .55; transition: opacity .2s, transform .4s var(--ease); }
+  .ss-hint #ssReset:hover { opacity: 1; transform: rotate(-90deg); }
+  .ss-hint button[hidden] { display: none; }
   .ss-hint button { border: 0; background: none; font: inherit; color: var(--ink); font-weight: 700; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
 
   /* ---------- Animations ---------- */
@@ -257,6 +233,17 @@
   @keyframes shine { to { background-position: -250% 0; } }
   @keyframes loadbar { 0% { transform: translateX(-100%); } 100% { transform: translateX(250%); } }
 
+  /* Маленькое окно (виджет 360×480) — компактное приветствие */
+  @media (max-height: 620px) {
+    .ss-hero { padding-top: 8px; }
+    .ss-orb { width: 56px; height: 56px; border-radius: 18px; margin-bottom: 14px; }
+    .ss-orb svg { width: 24px; height: 24px; }
+    .ss-hero h1 { font-size: 26px; }
+    .ss-hero p, .starter small { display: none; }
+    .ss-starters { margin-top: 16px; gap: 8px; }
+    .starter { padding: 8px 12px; }
+    .starter .ic { width: 32px; height: 32px; }
+  }
   @media (max-width: 480px) {
     .ss-starters { grid-template-columns: 1fr; }
     .chips, .cards, .handoff, .connecting { margin-left: 0; }
@@ -271,19 +258,6 @@
 <!-- SprayStore Chat — страница предназначена для встраивания через <iframe> -->
 <div id="ss-widget">
   <main class="ss-chat" id="ssChat" data-mode="ai" aria-label="Чат поддержки SprayStore">
-    <header class="ss-head">
-      <div class="ss-avatar" id="ssAvatar">AI<span class="dot"></span></div>
-      <div class="ss-title">
-        <b id="ssName">ИИ-помощник SprayStore</b>
-        <small id="ssStatus">Отвечает мгновенно · 24/7</small>
-      </div>
-      <button class="ss-icon-btn" id="ssReset" title="Начать заново" aria-label="Начать заново">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>
-      </button>
-      <button class="ss-icon-btn" id="ssClose" title="Закрыть" aria-label="Закрыть" hidden>
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
-      </button>
-    </header>
     <div class="ss-mode-bar"></div>
 
     <div class="ss-body" id="ssBody" aria-live="polite"></div>
@@ -296,8 +270,11 @@
         </button>
       </form>
       <div class="ss-hint">
-        <span id="ssHintText">ИИ может ошибаться</span>
-        <button type="button" id="ssHumanLink">Позвать человека</button>
+        <span><i class="dot"></i><span id="ssHintText">ИИ-помощник</span></span>
+        <span class="acts">
+          <button type="button" id="ssHumanLink">Позвать человека</button>
+          <button type="button" id="ssReset" title="Новый диалог" aria-label="Новый диалог"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg></button>
+        </span>
       </div>
     </footer>
   </main>
@@ -474,8 +451,7 @@
 
   const $ = id => document.getElementById(id);
   const el = { chat: $('ssChat'), body: $('ssBody'), input: $('ssInput'), send: $('ssSend'), form: $('ssForm'),
-    close: $('ssClose'), avatar: $('ssAvatar'),
-    name: $('ssName'), status: $('ssStatus'), hint: $('ssHintText'), humanLink: $('ssHumanLink') };
+    hint: $('ssHintText'), humanLink: $('ssHumanLink') };
 
   const wait = ms => new Promise(r => setTimeout(r, ms));
   const rand = ([a, b]) => a + Math.random() * (b - a);
@@ -597,20 +573,10 @@
   function setMode(mode) {
     state.mode = mode;
     el.chat.dataset.mode = mode;
-    if (mode === 'ai') {
-      el.avatar.className = 'ss-avatar'; el.avatar.firstChild.nodeValue = 'AI';
-      el.name.textContent = `ИИ-помощник ${CONFIG.brand}`;
-      el.status.textContent = 'Отвечает мгновенно · 24/7';
-      el.hint.textContent = 'ИИ может ошибаться'; el.humanLink.hidden = false;
-    } else if (mode === 'connecting') {
-      el.status.textContent = 'Подключаем специалиста…';
-      el.humanLink.hidden = true;
-    } else if (mode === 'operator') {
-      el.avatar.className = 'ss-avatar op'; el.avatar.firstChild.nodeValue = state.operator.initials;
-      el.name.textContent = state.operator.name;
-      el.status.textContent = `${state.operator.role} · в чате`;
-      el.hint.textContent = 'Вы общаетесь с человеком'; el.humanLink.hidden = true;
-    }
+    if (mode === 'ai') el.hint.textContent = 'ИИ-помощник';
+    else if (mode === 'connecting') el.hint.textContent = 'Подключаем специалиста…';
+    else if (mode === 'operator') el.hint.textContent = `${state.operator.name} · специалист`;
+    el.humanLink.hidden = mode !== 'ai';
     el.input.placeholder = mode === 'connecting' ? 'Можно писать — специалист увидит…' : 'Напишите вопрос…';
   }
 
@@ -758,7 +724,7 @@
 
   /* =====================================================================
    *  СВЯЗЬ С САЙТОМ-РОДИТЕЛЕМ (iframe ⇄ postMessage)
-   *  Исходящие: ready, message, user_message, handoff_offer, handoff_start, operator_joined, close
+   *  Исходящие: ready, message, user_message, handoff_offer, handoff_start, operator_joined
    *  Входящие:  { source: 'spraystore-host', type: 'send' | 'reset' | 'handoff' | 'focus', text? }
    * ===================================================================== */
   const embedded = window.self !== window.top;
@@ -777,11 +743,8 @@
   });
 
   /* ---------- Events ---------- */
-  el.close.hidden = !embedded;
-  el.close.onclick = () => emit('close');
   $('ssReset').onclick = reset;
   el.humanLink.onclick = () => { hideHero(); renderMessage(push('user', 'Позовите специалиста')); startHandoff(); };
-  document.addEventListener('keydown', e => { if (e.key === 'Escape') emit('close'); });
 
   el.input.addEventListener('input', () => {
     el.send.disabled = !el.input.value.trim();
