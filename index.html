@@ -120,10 +120,34 @@
   .sys::before, .sys::after { content: ""; flex: 1; height: 1px; background: var(--line); }
 
   /* typing */
-  .typing .bubble { display: flex; gap: 4px; padding: 14px 16px; }
-  .typing .bubble i { width: 7px; height: 7px; border-radius: 50%; background: #c9c5bb; animation: bounce 1.2s infinite; }
-  .typing .bubble i:nth-child(2) { animation-delay: .15s; }
-  .typing .bubble i:nth-child(3) { animation-delay: .3s; }
+  .typing .bubble { display: flex; align-items: center; gap: 9px; padding: 11px 14px; }
+  .typing .spark { flex: none; width: 18px; height: 18px; color: var(--yellow-deep); animation: sparkSpin 2.4s linear infinite, sparkPulse 1.6s ease-in-out infinite; }
+  .typing .think {
+    font-size: 13.5px; font-weight: 600; color: transparent; white-space: nowrap;
+    background: linear-gradient(100deg, #b9b5aa 30%, var(--ink) 50%, #b9b5aa 70%) 0 0 / 250% 100%;
+    -webkit-background-clip: text; background-clip: text; animation: thinkShimmer 1.8s linear infinite;
+  }
+  .typing .think.swap { animation: thinkShimmer 1.8s linear infinite, thinkIn .35s var(--ease); }
+  .typing .dots::after { content: ""; animation: dots 1.4s steps(4, end) infinite; }
+
+  /* streaming + feedback */
+  .bubble.streaming::after {
+    content: ""; display: inline-block; width: 7px; height: 14px; margin-left: 2px; vertical-align: -2px;
+    background: var(--yellow-deep); border-radius: 2px; animation: caret .9s steps(2, start) infinite;
+  }
+  .bubble.streaming .meta, .bubble.streaming .fb { visibility: hidden; }
+  .fb { display: flex; align-items: center; gap: 2px; margin: 6px -6px -4px; animation: msgIn .35s var(--ease) both; }
+  .fb button {
+    border: 0; background: none; color: #a6a298; padding: 5px 6px; border-radius: 8px; cursor: pointer;
+    display: grid; place-items: center; transition: color .15s, background .15s, transform .2s var(--spring);
+  }
+  .fb button:hover { color: var(--ink); background: var(--paper); }
+  .fb button:active { transform: scale(.88); }
+  .fb button.on { color: var(--ink); background: var(--yellow); }
+  .fb button.on.bad { color: #fff; background: var(--ink); }
+  .fb button svg { width: 15px; height: 15px; }
+  .fb .sep { flex: 1; }
+  .fb .note { font-size: 11.5px; color: var(--muted); margin-left: 6px; animation: msgIn .3s var(--ease) both; }
 
   /* Quick replies */
   .chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 12px 34px; animation: msgIn .5s var(--ease) both; }
@@ -221,6 +245,12 @@
   @keyframes msgIn { from { opacity: 0; transform: translateY(10px) scale(.98); } }
   @keyframes popIn { from { opacity: 0; transform: translateY(14px) scale(.94); } }
   @keyframes bounce { 0%, 60%, 100% { transform: translateY(0); opacity: .5; } 30% { transform: translateY(-5px); opacity: 1; } }
+  @keyframes sparkSpin { to { transform: rotate(360deg); } }
+  @keyframes sparkPulse { 0%, 100% { scale: .8; } 50% { scale: 1.15; } }
+  @keyframes thinkShimmer { to { background-position: -250% 0; } }
+  @keyframes thinkIn { from { opacity: 0; transform: translateY(5px); } }
+  @keyframes dots { 0% { content: ""; } 25% { content: "."; } 50% { content: ".."; } 75% { content: "..."; } }
+  @keyframes caret { to { visibility: hidden; } }
   @keyframes spin { to { transform: rotate(360deg); } }
   @keyframes drift { to { transform: translate(-40px, 30px) scale(1.15); } }
   @keyframes shine { to { background-position: -250% 0; } }
@@ -474,7 +504,63 @@
     return last && last.classList.contains('msg') ? last.dataset.role : null;
   }
 
-  function renderMessage({ role, text, ts }) {
+  const ICONS = {
+    like: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 10v11H3V10h4zM7 10l4-8a2.5 2.5 0 0 1 2.5 2.5V8H19a2 2 0 0 1 2 2.3l-1.2 7.5A2 2 0 0 1 17.8 19H7"/></svg>',
+    dislike: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 14V3h4v11h-4zM17 14l-4 8a2.5 2.5 0 0 1-2.5-2.5V16H5a2 2 0 0 1-2-2.3l1.2-7.5A2 2 0 0 1 6.2 5H17"/></svg>',
+    flag: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 21V4M5 4h11l-2 4 2 4H5"/></svg>'
+  };
+  const FB_NOTES = { like: 'Спасибо за оценку!', dislike: 'Спасибо, учтём', reported: 'Жалоба отправлена' };
+
+  /** Кнопки 👍 👎 🚩 — заглушки: событие уходит в родителя через postMessage, на сервер пока ничего не шлём */
+  function renderFeedback(item) {
+    const fb = document.createElement('div');
+    fb.className = 'fb';
+    fb.innerHTML = `
+      <button type="button" data-v="like" title="Хороший ответ" aria-label="Хороший ответ">${ICONS.like}</button>
+      <button type="button" data-v="dislike" class="bad" title="Плохой ответ" aria-label="Плохой ответ">${ICONS.dislike}</button>
+      <span class="sep"></span>
+      <button type="button" data-v="reported" title="Пожаловаться" aria-label="Пожаловаться">${ICONS.flag}</button>`;
+    const paint = () => {
+      fb.querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.v === item.fb));
+      fb.querySelector('.note')?.remove();
+      if (item.fb) {
+        const n = document.createElement('span'); n.className = 'note'; n.textContent = FB_NOTES[item.fb];
+        fb.insertBefore(n, fb.querySelector('.sep'));
+      }
+    };
+    fb.querySelectorAll('button').forEach(b => b.onclick = () => {
+      const v = b.dataset.v;
+      item.fb = item.fb === v ? null : v;   // повторный клик снимает оценку
+      // TODO: отправить на сервер, напр. fetch('/api/feedback', { method:'POST', body: JSON.stringify({ text: item.text, value: item.fb }) })
+      emit('feedback', { value: item.fb, text: item.text });
+      save(); paint();
+    });
+    paint();
+    return fb;
+  }
+
+  /** Плавная «печать» ответа: слово за словом, общая длительность ограничена */
+  async function streamInto(bubble, text, metaHtml, fb) {
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const parts = text.match(/\s+|\S+/g) || [];
+    const tick = 32, maxMs = 3500;
+    const step = Math.max(1, Math.ceil(parts.length / (maxMs / tick)));
+    bubble.classList.add('streaming');
+    for (let i = 0; i < parts.length && !reduce; i += step) {
+      let part = parts.slice(0, i + step).join('');
+      if ((part.match(/\*\*/g) || []).length % 2) part += '**';   // не мигать незакрытым **
+      bubble.innerHTML = md(part);
+      scrollDown();
+      await wait(tick + Math.random() * 18);
+    }
+    bubble.innerHTML = md(text) + metaHtml;
+    if (fb) bubble.appendChild(fb);
+    bubble.classList.remove('streaming');
+    scrollDown();
+  }
+
+  function renderMessage(item, { stream = false } = {}) {
+    const { role, text, ts } = item;
     if (role === 'system') {
       const d = document.createElement('div');
       d.className = 'sys'; d.textContent = text;
@@ -494,9 +580,13 @@
     }
     const b = document.createElement('div');
     b.className = 'bubble';
-    b.innerHTML = md(text) + `<span class="meta">${time(ts)}</span>`;
+    const metaHtml = `<span class="meta">${time(ts)}</span>`;
+    const fb = role === 'bot' && !item.local ? renderFeedback(item) : null;
     m.appendChild(b);
     el.body.appendChild(m);
+    if (stream) return streamInto(b, text, metaHtml, fb);
+    b.innerHTML = md(text) + metaHtml;
+    if (fb) b.appendChild(fb);
     scrollDown();
   }
 
@@ -529,9 +619,23 @@
   function showTyping() {
     const t = document.createElement('div');
     t.className = 'msg typing ' + (state.mode === 'operator' ? 'op' : 'bot');
-    t.innerHTML = `<div class="ava">${state.mode === 'operator' ? state.operator.initials : 'AI'}</div><div class="bubble"><i></i><i></i><i></i></div>`;
+    if (state.mode === 'operator') {
+      t.innerHTML = `<div class="ava">${state.operator.initials}</div><div class="bubble"><span class="think dots">печатает</span></div>`;
+      el.body.appendChild(t); scrollDown();
+      return () => t.remove();
+    }
+    const phrases = ['Думаю', 'Ищу в базе знаний', 'Подбираю ответ', 'Формулирую'];
+    t.innerHTML = `<div class="ava">AI</div><div class="bubble">
+      <svg class="spark" viewBox="0 0 24 24" fill="currentColor"><path d="M12 1.5c.5 5.2 2.2 8.7 5 10.5-2.8 1.8-4.5 5.3-5 10.5-.5-5.2-2.2-8.7-5-10.5 2.8-1.8 4.5-5.3 5-10.5z"/></svg>
+      <span class="think dots">${phrases[0]}</span></div>`;
     el.body.appendChild(t); scrollDown();
-    return () => t.remove();
+    const label = t.querySelector('.think');
+    let i = 0;
+    const iv = setInterval(() => {
+      label.textContent = phrases[i = (i + 1) % phrases.length];
+      label.classList.remove('swap'); void label.offsetWidth; label.classList.add('swap');
+    }, 1800);
+    return () => { clearInterval(iv); t.remove(); };
   }
 
   function renderHandoffOffer(reason) {
@@ -558,7 +662,7 @@
     card.querySelector('[data-a="no"]').onclick = () => {
       card.classList.add('done');
       state.nextOfferAt = state.userCount + CONFIG.reofferEvery;
-      botSay({ text: 'Хорошо, продолжаем! Кнопка «Позвать человека» всегда внизу 👇' });
+      botSay({ text: 'Хорошо, продолжаем! Кнопка «Позвать человека» всегда внизу 👇' }, { local: true });
     };
     el.body.appendChild(card); scrollDown();
   }
@@ -583,9 +687,10 @@
     return item;
   }
 
-  function botSay(res) {
-    const item = push(state.mode === 'operator' ? 'op' : 'bot', res.text, { chips: res.chips, cards: res.cards });
-    renderMessage(item);
+  async function botSay(res, { local = false } = {}) {
+    const isAI = state.mode !== 'operator';
+    const item = push(isAI ? 'bot' : 'op', res.text, { chips: res.chips, cards: res.cards, ...(local ? { local: true } : {}) });
+    await renderMessage(item, { stream: isAI });
     emit('message', { role: item.role, text: item.text });
     renderCards(res.cards);
     renderChips(res.chips);
@@ -616,7 +721,7 @@
       res = { text: 'Похоже, связь прервалась. Давайте я подключу специалиста.', confident: false, forceHandoff: true };
     }
     stop();
-    botSay(res);
+    await botSay(res);
     if (!res.confident) state.lowConfidence++;
 
     // Предложение перейти на живую поддержку: после 3–4 вопросов, при двух «непониманиях» подряд или по теме
