@@ -199,7 +199,7 @@ def build_chunks() -> list[dict]:
             })
     return result
 
-DB_PATH = "./chroma_spraystore"
+DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "chroma_spraystore")
 COLLECTION = "spraystore"
 
 def get_collection():
@@ -249,7 +249,8 @@ SYSTEM_PROMPT = """Ты — умный ассистент интернет-ма�
 {context}
 === КОНЕЦ КОНТЕКСТА ==="""
 
-def ask(question: str, history: list | None = None, k: int = 4, debug: bool = False) -> str:
+def answer(question: str, history: list | None = None, k: int = 4, debug: bool = False) -> dict:
+    """Возвращает {"text": ответ, "hits": найденные чанки}."""
     hits = retrieve(question, k=k)
     if debug:
         for h in hits:
@@ -267,7 +268,10 @@ def ask(question: str, history: list | None = None, k: int = 4, debug: bool = Fa
         messages=messages,
         temperature=0.3,
     )
-    return r.choices[0].message.content
+    return {"text": r.choices[0].message.content, "hits": hits}
+
+def ask(question: str, history: list | None = None, k: int = 4, debug: bool = False) -> str:
+    return answer(question, history, k=k, debug=debug)["text"]
 
 if __name__ == "__main__":
     build_index(force=False)  # force=True — пересобрать после правок базы
