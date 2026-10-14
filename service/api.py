@@ -11,8 +11,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
+import admin
 import catalog
 import catalog_chat
+import kb
 import main as rag
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -35,7 +37,7 @@ CREATE TABLE IF NOT EXISTS feedback (
 CREATE TABLE IF NOT EXISTS csat (
     session_id TEXT PRIMARY KEY, score INTEGER, ts REAL
 );
-"""
+""" + kb.SCHEMA
 
 
 @contextmanager
@@ -60,14 +62,20 @@ async def lifespan(_: FastAPI):
     with db() as con:
         con.executescript(SCHEMA)
         migrate(con)
-    rag.build_index(force=False)
+        kb.seed(con, rag.KNOWLEDGE_BASE)   # первый запуск: встроенная база попадает в БД и дальше правится в /admin
+    rag.build_index(force=True)           # индекс всегда соответствует базе
     catalog.start_background_sync()   # без KIT_API_TOKEN ничего не делает
     yield
     catalog.stop_background_sync()
 
 
+rag.KB_PROVIDER = kb.provider(db)   # статьи берём из БД, а не из словаря в коде
+
 app = FastAPI(title="SprayStore RAG", lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=CORS_ORIGINS, allow_methods=["*"], allow_headers=["*"])
+
+
+app.include_router(admin.make_router(db, rag, lambda: MIN_SCORE))
 
 
 class HistoryItem(BaseModel):
@@ -186,3 +194,8 @@ def index():
 @app.get("/embed-example.html")
 def embed_example():
     return FileResponse(os.path.join(ROOT, "embed-example.html"))
+
+
+@app.get("/admin")
+def admin_page():
+    return FileResponse(os.path.join(ROOT, "admin.html"), headers={"X-Robots-Tag": "noindex", "Cache-Control": "no-store"})

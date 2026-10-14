@@ -1,4 +1,5 @@
 import os
+import re
 import uuid
 import chromadb
 from openai import OpenAI
@@ -152,50 +153,88 @@ KNOWLEDGE_BASE = {
     """,
 }
 
-def chunk_text(text: str, max_chars: int = 500, overlap: int = 80) -> list[str]:
-    """Режем по абзацам, длинные абзацы — по предложениям."""
-    paragraphs = [p.strip() for p in text.split("\n\n") if p.strip()]
-    chunks, buf = [], ""
+_UNITS = re.compile(r"(?<=[.!?])\s+|\n")
 
+
+def _split_words(units: list[str], max_chars: int):
+    """Предложение длиннее лимита (нет точек) режем по словам — но не посреди слова."""
+    for u in units:
+        while len(u) > max_chars:
+            cut = u.rfind(" ", 0, max_chars)
+            cut = cut if cut > 0 else max_chars
+            yield u[:cut]
+            u = u[cut:].lstrip()
+        yield u
+
+
+def _split_long(para: str, max_chars: int, overlap: int) -> list[str]:
+    """Длинный абзац режем по предложениям/строкам; хвост предыдущего куска (целое предложение) идёт в следующий."""
+    chunks, cur, last = [], "", ""
+    for unit in (u.strip() for u in _split_words(_UNITS.split(para), max_chars)):
+        if not unit:
+            continue
+        if cur and len(cur) + len(unit) + 1 > max_chars:
+            chunks.append(cur)
+            # перекрытие — только целое предложение, чтобы не резать слова
+            cur = (last + " " + unit) if last and len(last) <= overlap else unit
+        else:
+            cur = (cur + " " + unit) if cur else unit
+        last = unit
+    if cur:
+        chunks.append(cur)
+    return chunks
+
+
+def chunk_text(text: str, max_chars: int = 500, overlap: int = 120) -> list[str]:
+    """Режем по абзацам (строки списка сохраняются), длинные абзацы — по предложениям."""
+    paragraphs = []
+    for p in re.split(r"\n\s*\n", text):
+        lines = [ln.strip() for ln in p.splitlines() if ln.strip()]
+        if lines:
+            paragraphs.append("\n".join(lines))
+    chunks, buf = [], ""
     for para in paragraphs:
-        # абзац длиннее лимита — режем на предложения
         if len(para) > max_chars:
             if buf:
-                chunks.append(buf.strip())
+                chunks.append(buf)
                 buf = ""
-            sentences = [s.strip() for s in para.replace("!", ".").replace("?", ".").split(".") if s.strip()]
-            cur = ""
-            for s in sentences:
-                if len(cur) + len(s) + 2 <= max_chars:
-                    cur = (cur + ". " + s).strip(". ") if cur else s
-                else:
-                    chunks.append(cur.strip())
-                    # перекрытие: последние overlap символов уносим в следующий чанк
-                    cur = (cur[-overlap:] + " " + s).strip() if overlap else s
-            if cur:
-                chunks.append(cur.strip())
+            chunks.extend(_split_long(para, max_chars, overlap))
+        elif buf and len(buf) + len(para) + 2 > max_chars:
+            chunks.append(buf)
+            buf = para
         else:
-            if len(buf) + len(para) + 2 <= max_chars:
-                buf = (buf + "\n\n" + para).strip() if buf else para
-            else:
-                chunks.append(buf.strip())
-                buf = para
-
+            buf = (buf + "\n\n" + para) if buf else para
     if buf:
-        chunks.append(buf.strip())
+        chunks.append(buf)
     return chunks
+
+
+# Источник статей. По умолчанию — словарь выше; сервис подменяет его на БД (редактируется в /admin).
+# Провайдер возвращает [{"id", "title", "body", "kind": "article"|"qa"}].
+KB_PROVIDER = None
+QA_BOOST = 0.03   # эталонные пары «вопрос — ответ», добавленные из админки, выигрывают у обычных статей
+
+
+def load_articles() -> list[dict]:
+    if KB_PROVIDER:
+        return KB_PROVIDER()
+    return [{"id": t, "title": t, "body": b, "kind": "article"} for t, b in KNOWLEDGE_BASE.items()]
 
 
 def build_chunks() -> list[dict]:
     result = []
-    for topic, text in KNOWLEDGE_BASE.items():
-        for i, piece in enumerate(chunk_text(text)):
-            # e5 требует префикс "passage: " для документов
+    for art in load_articles():
+        body = art["body"]
+        if art.get("kind") == "qa":
+            body = f"В: {art['title']}\nО: {body}"
+        for i, piece in enumerate(chunk_text(body)):
+            # e5 требует префикс "passage: "; название статьи в эмбеддинге улучшает поиск
             result.append({
-                "id": f"{topic}::{i}",
-                "topic": topic,
+                "id": f"{art.get('id', art['title'])}::{i}",
+                "topic": art["title"],
+                "kind": art.get("kind", "article"),
                 "text": piece,
-                "embed_input": "passage: " + piece,
+                "embed_input": f"passage: {art['title']}. {piece}",
             })
     return result
 
@@ -209,35 +248,50 @@ def get_collection():
         metadata={"hnsw:space": "cosine"},
     )
 
+
+def _vec(x) -> list[float]:
+    return x.tolist() if hasattr(x, "tolist") else list(x)
+
+
 def build_index(force: bool = False):
+    """force=True — привести индекс в соответствие с базой: обновить изменённое, удалить лишнее.
+    Индекс не пустеет на время пересборки, поэтому чат можно не останавливать."""
     col = get_collection()
     if col.count() > 0 and not force:
         print(f"[index] уже собран: {col.count()} чанков")
         return col
 
-    if force and col.count() > 0:
-        col.delete(where={})  # очистить
-
     chunks = build_chunks()
-    col.add(
-        ids=[c["id"] for c in chunks],
-        documents=[c["text"] for c in chunks],
-        metadatas=[{"topic": c["topic"]} for c in chunks],
-        embeddings=[embedder.encode(c["embed_input"], normalize_embeddings=True).tolist()
-                    for c in chunks],
-    )
+    if chunks:
+        col.upsert(
+            ids=[c["id"] for c in chunks],
+            documents=[c["text"] for c in chunks],
+            metadatas=[{"topic": c["topic"], "kind": c["kind"]} for c in chunks],
+            embeddings=[_vec(embedder.encode(c["embed_input"], normalize_embeddings=True)) for c in chunks],
+        )
+    stale = set(col.get(include=[])["ids"]) - {c["id"] for c in chunks}
+    if stale:
+        col.delete(ids=sorted(stale))
     print(f"[index] собрано {col.count()} чанков")
     return col
 
 def retrieve(question: str, k: int = 4) -> list[dict]:
     col = get_collection()
+    if col.count() == 0:
+        return []
     # e5 требует префикс "query: " для запроса
-    q_vec = embedder.encode("query: " + question, normalize_embeddings=True).tolist()
-    res = col.query(query_embeddings=[q_vec], n_results=k)
+    q_vec = _vec(embedder.encode("query: " + question, normalize_embeddings=True))
+    res = col.query(query_embeddings=[q_vec], n_results=min(k, col.count()))
     hits = []
     for text, meta, dist in zip(res["documents"][0], res["metadatas"][0], res["distances"][0]):
-        hits.append({"text": text, "topic": meta["topic"], "score": 1 - dist})
-    return hits
+        kind = meta.get("kind", "article")
+        hits.append({"text": text, "topic": meta["topic"], "kind": kind,
+                     "score": 1 - dist + (QA_BOOST if kind == "qa" else 0.0)})
+    return sorted(hits, key=lambda h: -h["score"])
+
+
+def build_context(hits: list[dict]) -> str:
+    return "\n\n---\n\n".join(f"[{h['topic']}]\n{h['text']}" for h in hits)
 
 MODEL = "deepseek-v4-1-flash"
 PROMPT_VERSION = "v3"   # менять при правках SYSTEM_PROMPT — попадает в лог для разбора дизлайков
@@ -285,7 +339,7 @@ def answer(question: str, history: list | None = None, k: int = 4, debug: bool =
         for h in hits:
             print(f"  [{h['score']:.3f}] {h['topic']}: {h['text'][:80]}...")
 
-    context = "\n\n---\n\n".join(f"[{h['topic']}]\n{h['text']}" for h in hits)
+    context = build_context(hits)
 
     products: list = []
     text = None

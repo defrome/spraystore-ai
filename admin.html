@@ -1,0 +1,645 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Админка · SprayStore</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f7f6f4; --surface: #fff; --line: #e8e6e2; --line-2: #d3d0ca;
+    --text: #171614; --muted: #77736c; --hover: #f1f0ed; --sel: #ebe9e5;
+    --ink: #171614; --on-ink: #fff; --danger: #b3261e; --r: 8px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #121211; --surface: #191918; --line: #2a2927; --line-2: #3d3b38;
+      --text: #ecebe8; --muted: #8d8983; --hover: #222120; --sel: #2b2a28;
+      --ink: #ecebe8; --on-ink: #121211; --danger: #f08a82;
+    }
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font: 14px/1.5 Manrope, system-ui, -apple-system, "Segoe UI", sans-serif;
+    background: var(--bg); color: var(--text); -webkit-font-smoothing: antialiased;
+    font-variant-numeric: tabular-nums;
+  }
+  button, input, textarea, select { font: inherit; color: inherit; }
+  button { cursor: pointer; }
+  :focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+  [hidden] { display: none !important; }
+  .muted { color: var(--muted); }
+  .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+
+  /* ── каркас ── */
+  .app { display: grid; grid-template-columns: 216px 1fr; height: 100vh; }
+  .side { border-right: 1px solid var(--line); padding: 20px 12px; display: flex; flex-direction: column; gap: 2px; }
+  .brand { padding: 0 10px 18px; font-weight: 700; letter-spacing: -.01em; }
+  .brand span { display: block; font-weight: 500; font-size: 12px; color: var(--muted); }
+  .nav a {
+    display: flex; justify-content: space-between; align-items: center; gap: 8px;
+    padding: 7px 10px; border-radius: var(--r); color: var(--muted); text-decoration: none; font-weight: 500;
+  }
+  .nav a:hover { background: var(--hover); color: var(--text); }
+  .nav a[aria-current="page"] { background: var(--sel); color: var(--text); font-weight: 600; }
+  .nav .n { font-size: 12px; min-width: 20px; text-align: center; padding: 0 6px; border-radius: 10px; background: var(--ink); color: var(--on-ink); font-weight: 600; }
+  .side .spacer { flex: 1; }
+  .side .btn.ghost { text-align: left; }
+  .main { min-width: 0; height: 100vh; display: flex; flex-direction: column; }
+  #view { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  .head { min-height: 82px; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 18px 28px; border-bottom: 1px solid var(--line); }
+  .head h1 { font-size: 17px; font-weight: 700; letter-spacing: -.01em; }
+  .head .sub { color: var(--muted); font-size: 13px; }
+  .head .tools { display: flex; gap: 8px; align-items: center; }
+
+  .split { flex: 1; min-height: 0; display: grid; grid-template-columns: 340px 1fr; }
+  .list { border-right: 1px solid var(--line); overflow: auto; display: flex; flex-direction: column; }
+  .list-top { padding: 12px; border-bottom: 1px solid var(--line); display: flex; flex-direction: column; gap: 8px; position: sticky; top: 0; background: var(--bg); z-index: 1; }
+  .item { display: block; width: 100%; text-align: left; background: none; border: 0; border-bottom: 1px solid var(--line); padding: 12px 16px; }
+  .item:hover { background: var(--hover); }
+  .item[aria-selected="true"] { background: var(--sel); }
+  .item .t { font-weight: 600; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .item .m { font-size: 12px; color: var(--muted); margin-top: 2px; display: flex; gap: 6px; flex-wrap: wrap; }
+  .item.off .t { color: var(--muted); font-weight: 500; }
+  .list-foot { padding: 12px 16px; font-size: 12px; color: var(--muted); margin-top: auto; }
+  .detail { overflow: auto; padding: 24px 32px 48px; }
+  .detail > .wrap { max-width: 760px; }
+  .empty { color: var(--muted); padding: 48px 16px; text-align: center; }
+  .back { display: none; }
+
+  /* ── элементы ── */
+  .btn { border: 1px solid var(--line-2); background: var(--surface); border-radius: var(--r); padding: 7px 13px; font-weight: 600; line-height: 1.3; white-space: nowrap; }
+  .btn:hover:not(:disabled) { border-color: var(--text); }
+  .btn.primary { background: var(--ink); color: var(--on-ink); border-color: var(--ink); }
+  .btn.primary:hover:not(:disabled) { opacity: .88; }
+  .btn.ghost { border-color: transparent; background: none; color: var(--muted); }
+  .btn.ghost:hover:not(:disabled) { color: var(--text); background: var(--hover); border-color: transparent; }
+  .btn.danger { color: var(--danger); }
+  .btn:disabled { opacity: .4; cursor: default; }
+  input[type=text], input[type=password], textarea, select {
+    width: 100%; background: var(--surface); border: 1px solid var(--line-2); border-radius: var(--r); padding: 8px 11px;
+  }
+  textarea { resize: vertical; line-height: 1.6; min-height: 96px; }
+  input:focus, textarea:focus, select:focus { outline: none; border-color: var(--text); }
+  label.f { display: block; font-size: 12px; font-weight: 600; color: var(--muted); margin: 18px 0 6px; }
+  .seg { display: inline-flex; border: 1px solid var(--line-2); border-radius: var(--r); padding: 2px; background: var(--surface); }
+  .seg button { border: 0; background: none; padding: 4px 11px; border-radius: 6px; color: var(--muted); font-weight: 600; font-size: 13px; }
+  .seg button[aria-pressed="true"] { background: var(--sel); color: var(--text); }
+  .tag { display: inline-block; font-size: 12px; line-height: 1.2; padding: 3px 8px; border: 1px solid var(--line-2); border-radius: 20px; color: var(--muted); }
+  .check { display: flex; gap: 8px; align-items: center; cursor: pointer; }
+  .check input { width: 16px; height: 16px; accent-color: var(--ink); }
+  kbd { font: 12px/1 ui-monospace, monospace; border: 1px solid var(--line-2); border-bottom-width: 2px; border-radius: 4px; padding: 1px 5px; color: var(--muted); }
+
+  .sec { margin-top: 28px; }
+  .sec:first-child { margin-top: 0; }
+  .sec h2 { font-size: 12px; font-weight: 600; color: var(--muted); margin-bottom: 8px; text-transform: uppercase; letter-spacing: .04em; }
+  .box { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 14px 16px; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .box.prev { color: var(--muted); font-size: 13px; padding: 10px 14px; }
+  .actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 24px; align-items: center; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .bar-info { display: flex; justify-content: space-between; gap: 12px; margin-top: 6px; font-size: 12px; color: var(--muted); }
+  .dirty { color: var(--text); font-weight: 600; }
+  .err { color: var(--danger); font-size: 13px; margin-top: 8px; }
+
+  .toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: var(--ink); color: var(--on-ink); border-radius: var(--r); padding: 10px 14px; display: flex; gap: 14px; align-items: center; z-index: 10; max-width: calc(100vw - 32px); }
+  .toast button { background: none; border: 0; color: inherit; text-decoration: underline; font-weight: 600; }
+
+  /* ── песочница ── */
+  .page { padding: 24px 28px 48px; overflow: auto; flex: 1; }
+  .page > .wrap { max-width: 820px; }
+  .hit { border: 1px solid var(--line); background: var(--surface); border-radius: var(--r); margin-bottom: 8px; }
+  .hit.dim { background: transparent; }
+  .hit summary { list-style: none; cursor: pointer; padding: 10px 14px; display: grid; grid-template-columns: 1fr 52px; gap: 4px 12px; align-items: center; }
+  .hit summary::-webkit-details-marker { display: none; }
+  .hit .name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .hit.dim .name { color: var(--muted); }
+  .hit .sc { text-align: right; font-weight: 600; }
+  .track { grid-column: 1 / -1; position: relative; height: 4px; background: var(--line); border-radius: 2px; }
+  .track i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--ink); border-radius: 2px; }
+  .hit.dim .track i { background: var(--line-2); }
+  .track b { position: absolute; top: -3px; bottom: -3px; width: 1px; background: var(--muted); }
+  .hit .body { padding: 0 14px 12px; color: var(--muted); white-space: pre-wrap; border-top: 1px solid var(--line); padding-top: 10px; }
+  details.pr summary { cursor: pointer; color: var(--muted); font-weight: 600; }
+  details.pr pre { margin-top: 8px; font: 12px/1.55 ui-monospace, monospace; white-space: pre-wrap; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 12px 14px; max-height: 360px; overflow: auto; }
+
+  /* ── таблицы и цифры ── */
+  table { width: 100%; border-collapse: collapse; }
+  th { text-align: left; font-size: 12px; color: var(--muted); font-weight: 600; padding: 8px 12px; border-bottom: 1px solid var(--line); }
+  td { padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  td.num, th.num { text-align: right; white-space: nowrap; }
+  .figs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; border: 1px solid var(--line); border-radius: var(--r); background: var(--line); overflow: hidden; }
+  .fig { padding: 16px 18px; background: var(--surface); }
+  .fig .v { font-size: 26px; font-weight: 700; letter-spacing: -.02em; line-height: 1.2; }
+  .fig .l { color: var(--muted); font-size: 12px; margin-top: 2px; }
+  .days { display: flex; align-items: flex-end; gap: 3px; height: 96px; border-bottom: 1px solid var(--line); }
+  .days div { flex: 0 1 28px; min-width: 2px; background: var(--line-2); border-radius: 2px 2px 0 0; position: relative; }
+  .days div i { position: absolute; left: 0; right: 0; bottom: 0; background: var(--ink); border-radius: 0; }
+  .res { white-space: nowrap; font-weight: 600; }
+  .res.bad { color: var(--danger); }
+
+  /* ── вход ── */
+  .login { min-height: 100vh; display: grid; place-items: center; padding: 16px; }
+  .login form { width: 100%; max-width: 340px; }
+  .login h1 { font-size: 20px; letter-spacing: -.01em; margin-bottom: 4px; }
+  .login p { color: var(--muted); margin-bottom: 20px; }
+
+  @media (max-width: 860px) {
+    .figs { grid-template-columns: repeat(2, 1fr); }
+    .list-foot { display: none; }
+    .app { grid-template-columns: 1fr; grid-template-rows: auto 1fr; height: auto; min-height: 100vh; }
+    .side { flex-direction: row; align-items: center; overflow-x: auto; padding: 8px 12px; border-right: 0; border-bottom: 1px solid var(--line); }
+    .brand, .side .spacer { display: none; }
+    .nav { display: flex; gap: 2px; }
+    .nav a { white-space: nowrap; }
+    .main, #view { height: auto; min-height: 0; }
+    .split { grid-template-columns: 1fr; }
+    .split .detail { display: none; }
+    .split.has-sel .list { display: none; }
+    .split.has-sel .detail { display: block; }
+    .list { border-right: 0; }
+    .back { display: inline-block; margin-bottom: 12px; }
+    .head, .page { padding-left: 16px; padding-right: 16px; }
+    .detail { padding: 16px 16px 48px; }
+  }
+  @media (prefers-reduced-motion: no-preference) { .toast { animation: up .18s ease-out; } @keyframes up { from { opacity: 0; transform: translate(-50%, 6px); } } }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script>
+'use strict';
+/* ═══ утилиты ═══ */
+const $ = (s, r = document) => r.querySelector(s);
+function h(tag, attrs, ...kids) {
+  const el = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs || {})) {
+    if (v == null || v === false) continue;
+    if (k === 'class') el.className = v;
+    else if (k.startsWith('on')) el.addEventListener(k.slice(2), v);
+    else if (k === 'value') el.value = v;
+    else if (k === 'checked') el.checked = !!v;
+    else el.setAttribute(k, v === true ? '' : v);
+  }
+  for (const c of kids.flat(Infinity)) { if (c == null || c === false) continue; el.append(c.nodeType ? c : document.createTextNode(c)); }
+  return el;
+}
+const store = {
+  get(k) { try { return localStorage.getItem(k); } catch { return null; } },
+  set(k, v) { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch {} },
+};
+const fmtDate = ts => new Date(ts * 1000).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+const plural = (n, a, b, c) => { const m = n % 100, d = n % 10; return m > 10 && m < 20 ? c : d === 1 ? a : d > 1 && d < 5 ? b : c; };
+
+let toastTimer;
+function toast(msg, action, ms = 3500) {
+  $('.toast')?.remove(); clearTimeout(toastTimer);
+  const t = h('div', { class: 'toast', role: 'status' }, h('span', {}, msg));
+  if (action) t.append(h('button', { onclick: () => { t.remove(); action.fn(); } }, action.label));
+  document.body.append(t);
+  toastTimer = setTimeout(() => t.remove(), action ? 8000 : ms);
+}
+
+/* ═══ API ═══ */
+let token = store.get('ss_admin_token') || '';
+async function api(path, opts = {}) {
+  let res;
+  try {
+    res = await fetch('/api/admin' + path, {
+      method: opts.method || 'GET',
+      headers: { Authorization: 'Bearer ' + token, ...(opts.body ? { 'Content-Type': 'application/json' } : {}) },
+      body: opts.body ? JSON.stringify(opts.body) : undefined,
+    });
+  } catch { throw new Error('Нет связи с сервером'); }
+  if (res.status === 401) { logout(); throw new Error('Неверный токен'); }
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const d = data.detail;
+    throw new Error(typeof d === 'string' ? d : d ? 'Проверьте заполнение полей' : 'Ошибка ' + res.status);
+  }
+  return data;
+}
+function logout() { token = ''; store.set('ss_admin_token', null); showLogin(); }
+
+/* ═══ каркас и роутер ═══ */
+const SECTIONS = [
+  ['inbox', 'Входящие'], ['kb', 'База знаний'], ['sandbox', 'Песочница'], ['eval', 'Проверки'], ['stats', 'Статистика'],
+];
+let cleanup = null, dirtyCheck = null, curHash = '', ignoreHash = false;
+
+function showLogin(msg) {
+  const input = h('input', { type: 'password', id: 'tok', autocomplete: 'current-password', placeholder: 'Токен доступа' });
+  const err = h('div', { class: 'err', role: 'alert' }, msg || '');
+  const form = h('form', { onsubmit: async e => {
+    e.preventDefault(); err.textContent = '';
+    const t = input.value.trim(); if (!t) return;
+    try {
+      const res = await fetch('/api/admin/ping', { headers: { Authorization: 'Bearer ' + t } });
+      if (!res.ok) { const d = (await res.json().catch(() => ({}))).detail; throw new Error(typeof d === 'string' ? d : 'Ошибка ' + res.status); }
+      token = t; store.set('ss_admin_token', t); boot();
+    } catch (ex) { err.textContent = ex instanceof TypeError ? 'Нет связи с сервером' : ex.message; input.select(); }
+  } },
+    h('h1', {}, 'SprayStore'), h('p', {}, 'Админка ИИ-поддержки'),
+    h('label', { class: 'sr', for: 'tok' }, 'Токен доступа'), input,
+    h('button', { class: 'btn primary', style: 'width:100%;margin-top:12px', type: 'submit' }, 'Войти'), err);
+  $('#root').replaceChildren(h('div', { class: 'login' }, form));
+  input.focus();
+}
+
+function buildShell() {
+  const nav = h('nav', { class: 'nav', 'aria-label': 'Разделы' },
+    SECTIONS.map(([id, name]) => h('a', { href: '#/' + id, 'data-id': id }, h('span', {}, name), id === 'inbox' ? h('span', { class: 'n', id: 'badge', hidden: true }) : null)));
+  $('#root').replaceChildren(h('div', { class: 'app' },
+    h('aside', { class: 'side' }, h('div', { class: 'brand' }, 'SprayStore', h('span', {}, 'Админка ИИ-поддержки')), nav,
+      h('div', { class: 'spacer' }), h('button', { class: 'btn ghost', onclick: logout }, 'Выйти')),
+    h('main', { class: 'main' }, h('div', { id: 'view' }))));
+}
+
+async function refreshBadge() {
+  try {
+    const { counts } = await api('/inbox?status=new&limit=1');
+    const b = $('#badge'); if (!b) return;
+    b.textContent = counts.new; b.hidden = !counts.new;
+  } catch {}
+}
+
+function render() {
+  if (cleanup) { cleanup(); cleanup = null; }
+  dirtyCheck = null;
+  const [name = 'inbox', ...rest] = location.hash.replace(/^#\//, '').split('?')[0].split('/');
+  const view = VIEWS[name] ? name : 'inbox';
+  document.querySelectorAll('.nav a').forEach(a => a.dataset.id === view ? a.setAttribute('aria-current', 'page') : a.removeAttribute('aria-current'));
+  document.title = SECTIONS.find(s => s[0] === view)[1] + ' · Админка SprayStore';
+  const root = $('#view'); root.replaceChildren();
+  cleanup = VIEWS[view](root, rest.join('/')) || null;
+}
+
+addEventListener('hashchange', () => {
+  if (ignoreHash) { ignoreHash = false; return; }
+  if (dirtyCheck && dirtyCheck() && !confirm('Есть несохранённые изменения. Уйти без сохранения?')) {
+    ignoreHash = true; location.hash = curHash; return;
+  }
+  curHash = location.hash; render();
+});
+addEventListener('beforeunload', e => { if (dirtyCheck && dirtyCheck()) { e.preventDefault(); e.returnValue = ''; } });
+
+function boot() {
+  if (!token) return showLogin();
+  api('/ping').then(() => {
+    buildShell(); curHash = location.hash;
+    if (!location.hash) location.hash = '#/inbox'; else render();
+    refreshBadge();
+  }).catch(e => { if (token) showLogin(e.message); });
+}
+
+/* ═══ общие куски ═══ */
+function head(title, sub, tools) {
+  return h('div', { class: 'head' }, h('div', {}, h('h1', {}, title), sub ? h('div', { class: 'sub' }, sub) : null), h('div', { class: 'tools' }, tools));
+}
+function seg(options, value, onChange) {
+  const wrap = h('div', { class: 'seg', role: 'group' });
+  const paint = v => [...wrap.children].forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === String(v))));
+  options.forEach(([v, label]) => wrap.append(h('button', { type: 'button', 'data-v': v, onclick: () => { paint(v); onChange(v); } }, label)));
+  paint(value); return wrap;
+}
+const typing = e => /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName);
+
+/* ═══ Входящие ═══ */
+const REASON = { dislike: 'Дизлайк', report: 'Жалоба', lowconf: 'Нет ответа' };
+let inboxTab = 'new';
+
+function inboxView(root, arg) {
+  let items = [], counts = { new: 0, done: 0, ignored: 0 }, selected = arg || null;
+  const list = h('div', { class: 'list', role: 'listbox', 'aria-label': 'Обращения' });
+  const detail = h('div', { class: 'detail' });
+  const split = h('div', { class: 'split' }, list, detail);
+  root.append(head('Входящие', 'Дизлайки, жалобы и вопросы, на которые бот не нашёл ответ'), split);
+
+  async function load() {
+    try { ({ items, counts } = await api('/inbox?status=' + inboxTab)); } catch (e) { return toast(e.message); }
+    if (!selected && items.length && matchMedia('(min-width: 861px)').matches) {   // на десктопе сразу открываем первое
+      selected = items[0].id; history.replaceState(null, '', '#/inbox/' + selected); curHash = location.hash;
+    }
+    paintList();
+    if (selected && items.some(i => i.id === selected)) paintDetail(); else if (!selected) detail.replaceChildren(emptyHint());
+    else { selected = null; detail.replaceChildren(emptyHint()); }
+    split.classList.toggle('has-sel', !!selected);
+    refreshBadge();
+  }
+  const emptyHint = () => h('div', { class: 'empty' }, items.length ? 'Выберите обращение слева' : (inboxTab === 'new' ? 'Новых обращений нет' : 'Здесь пока пусто'));
+
+  function paintList() {
+    const tabs = seg([['new', `Новые ${counts.new}`], ['done', `Решённые ${counts.done}`], ['ignored', `Пропущенные ${counts.ignored}`]], inboxTab,
+      v => { inboxTab = v; selected = null; location.hash = '#/inbox'; load(); });
+    list.replaceChildren(h('div', { class: 'list-top' }, tabs),
+      ...(items.length ? items.map(i => h('button', { class: 'item', role: 'option', 'aria-selected': String(i.id === selected), 'data-id': i.id, onclick: () => open(i.id) },
+        h('div', { class: 't' }, i.question),
+        h('div', { class: 'm' }, h('span', {}, REASON[i.reason]), '·', h('span', {}, fmtDate(i.ts)), i.reasons.length ? ['·', h('span', {}, i.reasons[0])] : null))) : [h('div', { class: 'empty' }, inboxTab === 'new' ? 'Новых обращений нет' : 'Пусто')]),
+      h('div', { class: 'list-foot' }, h('kbd', {}, 'J'), ' ', h('kbd', {}, 'K'), ' — листать, ', h('kbd', {}, 'E'), ' — исправить'));
+  }
+  function open(id) { selected = id; location.hash = '#/inbox/' + id; curHash = location.hash; ignoreHash = true; paintList(); paintDetail(); split.classList.add('has-sel'); }
+
+  async function paintDetail() {
+    const id = selected; let d;
+    try { d = await api('/inbox/' + id); } catch (e) { return toast(e.message); }
+    if (id !== selected) return;
+    const status = inboxTab;
+    const fixForm = h('div', { hidden: true, style: 'margin-top:32px;padding-top:4px;border-top:1px solid var(--line)' });
+    const body = h('div', { class: 'wrap' },
+      h('button', { class: 'btn ghost back', onclick: () => { selected = null; location.hash = '#/inbox'; curHash = location.hash; ignoreHash = true; split.classList.remove('has-sel'); paintList(); } }, '← К списку'),
+      d.previous.length ? h('div', { class: 'sec' }, h('h2', {}, 'Предыдущие реплики'), d.previous.map(p => h('div', { class: 'box prev', style: 'margin-bottom:6px' }, p.question + '\n— ' + p.answer))) : null,
+      h('div', { class: 'sec' }, h('h2', {}, 'Вопрос'), h('div', { class: 'box' }, d.question)),
+      h('div', { class: 'sec' }, h('h2', {}, 'Ответ бота'), h('div', { class: 'box' }, d.answer)),
+      h('div', { class: 'sec' }, h('h2', {}, 'Почему здесь'),
+        h('div', { class: 'row' }, h('span', { class: 'tag' }, REASON[d.reason]), d.reasons.map(r => h('span', { class: 'tag' }, r)), d.escalated ? h('span', { class: 'tag' }, 'Просил оператора') : null),
+        d.comment ? h('div', { class: 'box', style: 'margin-top:8px' }, d.comment) : null,
+        h('div', { class: 'muted', style: 'margin-top:8px;font-size:13px' },
+          `Найдено в базе: ${d.sources.length ? d.sources.join(', ') : 'ничего'} · лучшая оценка ${d.top_score != null ? d.top_score.toFixed(2) : '—'}`)),
+      h('div', { class: 'actions' },
+        status !== 'done' ? h('button', { class: 'btn primary', id: 'fixBtn', onclick: () => { fixForm.hidden = false; fixForm.querySelector('textarea').focus(); fixForm.scrollIntoView({ block: 'nearest' }); } }, 'Исправить ответ') : null,
+        h('button', { class: 'btn', onclick: () => { sandboxPrefill = d.question; location.hash = '#/sandbox'; } }, 'Открыть в песочнице'),
+        status === 'new' ? h('button', { class: 'btn ghost', id: 'skipBtn', onclick: () => resolve(d.id, 'ignored') }, 'Пропустить') : h('button', { class: 'btn ghost', onclick: () => resolve(d.id, 'new') }, 'Вернуть во входящие')),
+      fixForm);
+    // форма исправления
+    const q = h('input', { type: 'text', value: d.question, maxlength: 200, id: 'fixQ' });
+    const a = h('textarea', { rows: 6, maxlength: 20000, id: 'fixA', placeholder: 'Как должен отвечать бот. Пишите факты: цены, сроки, условия.' });
+    const ev = h('input', { type: 'checkbox', checked: true });
+    const err = h('div', { class: 'err', role: 'alert' });
+    const save = h('button', { class: 'btn primary', onclick: submit }, 'Сохранить в базу');
+    async function submit() {
+      err.textContent = '';
+      if (!q.value.trim() || !a.value.trim()) { err.textContent = 'Заполните вопрос и ответ'; return; }
+      save.disabled = true;
+      try {
+        const r = await api('/kb', { method: 'POST', body: { title: q.value.trim(), body: a.value.trim(), kind: 'qa' } });
+        if (ev.checked) await api('/eval', { method: 'POST', body: { question: q.value.trim(), expect_topic: q.value.trim(), expect_text: '' } });
+        await api(`/inbox/${d.id}/review`, { method: 'PUT', body: { status: 'done', article_id: r.article.id } });
+        toast(`Добавлено в базу, индекс обновлён (${r.chunks} фрагм.)`);
+        advance(d.id);
+      } catch (e) { err.textContent = e.message; save.disabled = false; }
+    }
+    a.addEventListener('keydown', e => { if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') submit(); });
+    fixForm.append(h('div', { class: 'sec' }, h('h2', {}, 'Исправление'),
+      h('label', { class: 'f', for: 'fixQ', style: 'margin-top:0' }, 'Вопрос'), q,
+      h('label', { class: 'f', for: 'fixA' }, 'Правильный ответ'), a,
+      h('div', { class: 'muted', style: 'font-size:12px;margin-top:6px' }, 'Эта пара получит приоритет над обычными статьями при поиске.'),
+      h('label', { class: 'check', style: 'margin-top:14px' }, ev, 'Добавить в контрольный набор'),
+      h('div', { class: 'row', style: 'margin-top:14px' }, save, h('button', { class: 'btn ghost', onclick: () => { fixForm.hidden = true; } }, 'Отмена'), h('span', { class: 'muted', style: 'font-size:12px' }, 'Ctrl+Enter')),
+      err));
+    detail.replaceChildren(body);
+    if (arg === 'fix') $('#fixBtn')?.click();
+  }
+
+  async function resolve(id, status) {
+    try { await api(`/inbox/${id}/review`, { method: 'PUT', body: { status } }); } catch (e) { return toast(e.message); }
+    toast(status === 'ignored' ? 'Пропущено' : 'Возвращено во входящие', { label: 'Отменить', fn: async () => { await api(`/inbox/${id}/review`, { method: 'PUT', body: { status: inboxTab === 'new' ? 'new' : inboxTab } }).catch(() => {}); load(); } });
+    advance(id);
+  }
+  function advance(id) {
+    const i = items.findIndex(x => x.id === id), next = items[i + 1] || items[i - 1];
+    selected = next && next.id !== id ? next.id : null;
+    location.hash = selected ? '#/inbox/' + selected : '#/inbox'; curHash = location.hash; ignoreHash = true;
+    load();
+  }
+  const keys = e => {
+    if (typing(e) || e.ctrlKey || e.metaKey || e.altKey) return;
+    const i = items.findIndex(x => x.id === selected);
+    if (e.key === 'j' && items.length) { open(items[Math.min(i + 1, items.length - 1)].id); $('.item[aria-selected="true"]')?.scrollIntoView({ block: 'nearest' }); }
+    else if (e.key === 'k' && items.length) { open(items[Math.max(i - 1, 0)].id); $('.item[aria-selected="true"]')?.scrollIntoView({ block: 'nearest' }); }
+    else if (e.key === 'e') { e.preventDefault(); $('#fixBtn')?.click(); }
+    else if (e.key === 's') $('#skipBtn')?.click();
+  };
+  document.addEventListener('keydown', keys);
+  load();
+  return () => document.removeEventListener('keydown', keys);
+}
+
+/* ═══ База знаний ═══ */
+let q = '', kindF = 'all';   // фильтры списка переживают переход между материалами
+function kbView(root, arg) {
+  let items = [], draft = null, snap = '', history = [];
+  const list = h('div', { class: 'list' });
+  const detail = h('div', { class: 'detail' });
+  const split = h('div', { class: 'split' }, list, detail);
+  root.append(head('База знаний', 'Всё, что бот знает о магазине. Изменения сразу попадают в поиск', h('button', { class: 'btn primary', onclick: () => { location.hash = '#/kb/new'; } }, 'Новый материал')), split);
+  const key = d => JSON.stringify([d.title, d.body, d.kind, d.enabled]);
+  dirtyCheck = () => !!draft && key(draft) !== snap;
+
+  async function loadList() { try { ({ items } = await api('/kb')); } catch (e) { toast(e.message); } paintList(); }
+  function paintList() {
+    const s = q.trim().toLowerCase();
+    const shown = items.filter(i => (kindF === 'all' || i.kind === kindF) && (!s || (i.title + ' ' + i.preview).toLowerCase().includes(s)));
+    const search = h('input', { type: 'text', placeholder: 'Поиск по базе', value: q, 'aria-label': 'Поиск по базе', oninput: e => { q = e.target.value; paintListBody(); } });
+    list.replaceChildren(h('div', { class: 'list-top' }, search, seg([['all', `Все ${items.length}`], ['article', 'Статьи'], ['qa', 'Ответы']], kindF, v => { kindF = v; paintList(); })), h('div', { id: 'kbItems' }));
+    paintListBody();
+    if (document.activeElement === document.body && q) search.focus();
+  }
+  function paintListBody() {
+    const s = q.trim().toLowerCase();
+    const shown = items.filter(i => (kindF === 'all' || i.kind === kindF) && (!s || (i.title + ' ' + i.preview).toLowerCase().includes(s)));
+    $('#kbItems', list).replaceChildren(...(shown.length ? shown.map(i => h('a', { class: 'item' + (i.enabled ? '' : ' off'), href: '#/kb/' + i.id, role: 'option', 'aria-selected': String(draft && draft.id === i.id), style: 'text-decoration:none;color:inherit' },
+      h('div', { class: 't' }, i.title),
+      h('div', { class: 'm' }, h('span', {}, i.kind === 'qa' ? 'Ответ' : 'Статья'), '·', h('span', {}, `${i.size} симв.`), i.enabled ? null : [h('span', {}, '·'), h('span', {}, 'выключено')]))) : [h('div', { class: 'empty' }, 'Ничего не найдено')]));
+  }
+
+  async function openArticle() {
+    if (arg === 'new') { draft = { id: null, title: '', body: '', kind: 'article', enabled: true }; history = []; }
+    else if (arg) {
+      try { const a = await api('/kb/' + arg); history = a.history; draft = { id: a.id, title: a.title, body: a.body, kind: a.kind, enabled: a.enabled }; }
+      catch (e) { toast(e.message); draft = null; location.hash = '#/kb'; return; }
+    } else draft = null;
+    snap = draft ? key(draft) : '';
+    split.classList.toggle('has-sel', !!draft);
+    paintEditor(); paintListBody();
+  }
+
+  function paintEditor() {
+    if (!draft) { detail.replaceChildren(h('div', { class: 'empty' }, 'Выберите материал слева или создайте новый')); return; }
+    const isQa = () => draft.kind === 'qa';
+    const title = h('input', { type: 'text', id: 'kbTitle', value: draft.title, maxlength: 200, oninput: e => { draft.title = e.target.value; refresh(); } });
+    const body = h('textarea', { id: 'kbBody', rows: 16, style: 'min-height:360px', value: draft.body, maxlength: 20000, oninput: e => { draft.body = e.target.value; refresh(); } });
+    const lblT = h('label', { class: 'f', for: 'kbTitle' });
+    const lblB = h('label', { class: 'f', for: 'kbBody' });
+    const hint = h('div', { class: 'muted', style: 'font-size:12px;margin-top:6px' });
+    const info = h('span', {}), state = h('span', {});
+    const save = h('button', { class: 'btn primary', onclick: doSave }, 'Сохранить');
+    const err = h('div', { class: 'err', role: 'alert' });
+    const en = h('input', { type: 'checkbox', checked: draft.enabled, onchange: e => { draft.enabled = e.target.checked; refresh(); } });
+    function refresh() {
+      lblT.textContent = isQa() ? 'Вопрос' : 'Название'; lblB.textContent = isQa() ? 'Ответ' : 'Текст';
+      hint.textContent = isQa() ? 'Пара «вопрос — ответ» получает приоритет над статьями. Формулируйте вопрос так, как его задаёт клиент.' : 'Пишите факты короткими абзацами: так материал лучше режется на фрагменты для поиска.';
+      const n = draft.body.length; info.textContent = `${n} симв. · ≈ ${Math.max(1, Math.ceil(n / 450))} ${plural(Math.max(1, Math.ceil(n / 450)), 'фрагмент', 'фрагмента', 'фрагментов')}`;
+      const dirty = key(draft) !== snap; state.textContent = dirty ? 'Есть несохранённые изменения' : (draft.id ? 'Сохранено' : ''); state.className = dirty ? 'dirty' : '';
+      save.disabled = !dirty || !draft.title.trim() || !draft.body.trim();
+    }
+    async function doSave() {
+      err.textContent = ''; save.disabled = true;
+      try {
+        const payload = { title: draft.title, body: draft.body, kind: draft.kind, enabled: draft.enabled };
+        const r = draft.id ? await api('/kb/' + draft.id, { method: 'PUT', body: payload }) : await api('/kb', { method: 'POST', body: payload });
+        toast(`Сохранено, индекс обновлён (${r.chunks} фрагм.)`);
+        snap = key(draft); await loadList();
+        if (!draft.id) { draft.id = r.article.id; snap = key(draft); location.hash = '#/kb/' + r.article.id; curHash = location.hash; ignoreHash = true; arg = String(r.article.id); }
+        else { const a = await api('/kb/' + draft.id); history = a.history; }
+        paintEditor();
+      } catch (e) { err.textContent = e.message; refresh(); }
+    }
+    async function del() {
+      const copy = { title: draft.title, body: draft.body, kind: draft.kind, enabled: draft.enabled };
+      try { await api('/kb/' + draft.id, { method: 'DELETE' }); } catch (e) { return toast(e.message); }
+      snap = key(draft);
+      toast('Материал удалён', { label: 'Отменить', fn: async () => { try { const r = await api('/kb', { method: 'POST', body: copy }); toast('Восстановлено'); location.hash = '#/kb/' + r.article.id; loadList(); } catch (e) { toast(e.message); } } });
+      location.hash = '#/kb'; loadList();
+    }
+    const kindSeg = seg([['article', 'Статья'], ['qa', 'Вопрос и ответ']], draft.kind, v => { draft.kind = v; refresh(); });
+    detail.replaceChildren(h('div', { class: 'wrap' },
+      h('a', { class: 'btn ghost back', href: '#/kb' }, '← К списку'),
+      h('div', { class: 'row', style: 'justify-content:space-between' }, kindSeg, h('label', { class: 'check' }, en, 'Участвует в ответах')),
+      lblT, title, lblB, body, hint,
+      h('div', { class: 'bar-info' }, info, state),
+      h('div', { class: 'actions' }, save, draft.id ? h('button', { class: 'btn ghost danger', onclick: del }, 'Удалить') : null, h('span', { class: 'muted', style: 'font-size:12px' }, 'Ctrl+S'), ),
+      err,
+      history.length ? h('details', { class: 'pr sec' }, h('summary', {}, `Предыдущие версии (${history.length})`),
+        h('table', { style: 'margin-top:8px' }, history.map(v => h('tr', {}, h('td', {}, fmtDate(v.ts)), h('td', { class: 'muted' }, `${v.body.length} симв.`),
+          h('td', { class: 'num' }, h('button', { class: 'btn ghost', onclick: () => { draft.title = v.title; draft.body = v.body; paintEditor(); toast('Версия подставлена, нажмите «Сохранить»'); } }, 'Вернуть'))))) ) : null));
+    refresh();
+    if (!draft.id) title.focus();
+  }
+  const keys = e => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') { e.preventDefault(); const b = [...detail.querySelectorAll('.btn.primary')].find(x => x.textContent === 'Сохранить'); if (b && !b.disabled) b.click(); } };
+  document.addEventListener('keydown', keys);
+  loadList().then(openArticle);
+  return () => document.removeEventListener('keydown', keys);
+}
+
+/* ═══ Песочница ═══ */
+let sandboxPrefill = '';
+function sandboxView(root) {
+  const q = h('textarea', { rows: 3, id: 'sbq', placeholder: 'Вопрос клиента, например: «чем красить водоэмульсионкой»', value: sandboxPrefill, maxlength: 2000 });
+  sandboxPrefill = '';
+  const out = h('div', { style: 'margin-top:28px' });
+  const find = h('button', { class: 'btn', onclick: () => run(false) }, 'Только поиск');
+  const gen = h('button', { class: 'btn primary', onclick: () => run(true) }, 'Поиск и ответ');
+  async function run(generate) {
+    const text = q.value.trim(); if (!text) return q.focus();
+    find.disabled = gen.disabled = true; out.replaceChildren(h('div', { class: 'muted' }, generate ? 'Ищу и спрашиваю модель…' : 'Ищу…'));
+    try { paint(await api('/sandbox', { method: 'POST', body: { question: text, generate } }), generate); }
+    catch (e) { out.replaceChildren(h('div', { class: 'err' }, e.message)); }
+    find.disabled = gen.disabled = false;
+  }
+  function paint(r, generate) {
+    const top = r.hits[0]?.score ?? 0, ok = top >= r.min_score;
+    out.replaceChildren(...[
+      h('div', { class: 'sec' }, h('h2', {}, 'Вердикт'),
+        h('div', {}, r.hits.length ? `Лучшее совпадение ${top.toFixed(2)} — ${ok ? 'выше' : 'ниже'} порога ${r.min_score.toFixed(2)}. ${ok ? 'Бот ответит уверенно.' : 'Бот пометит ответ как неуверенный.'}` : 'В базе ничего нет.')),
+      generate && r.answer != null ? h('div', { class: 'sec' }, h('h2', {}, `Ответ бота · ${(r.latency_ms / 1000).toFixed(1)} с`), h('div', { class: 'box' }, r.answer),
+        r.products?.length ? h('div', { class: 'muted', style: 'margin-top:6px;font-size:13px' }, 'Товары в контексте: ' + r.products.join('; ')) : null) : null,
+      h('div', { class: 'sec' }, h('h2', {}, 'Найденные фрагменты'),
+        h('div', { class: 'muted', style: 'font-size:12px;margin-bottom:8px' }, 'Вертикальная черта — порог уверенности. Светлые строки в промпт не попадают.'),
+        r.hits.map(x => h('details', { class: 'hit' + (x.used ? '' : ' dim') },
+          h('summary', {}, h('span', { class: 'name' }, x.topic, x.kind === 'qa' ? h('span', { class: 'tag', style: 'margin-left:8px' }, 'ответ') : null), h('span', { class: 'sc' }, x.score.toFixed(2)),
+            h('span', { class: 'track' }, h('i', { style: `width:${Math.max(0, Math.min(1, x.score)) * 100}%` }), h('b', { style: `left:${r.min_score * 100}%` }))),
+          h('div', { class: 'body' }, x.text)))),
+      h('details', { class: 'pr sec' }, h('summary', {}, `Промпт целиком · ${r.model}, ${r.prompt_version}`), h('pre', {}, r.prompt))].filter(Boolean));
+  }
+  q.addEventListener('keydown', e => { if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') run(true); });
+  root.append(head('Песочница', 'Что бот найдёт в базе и что ответит на вопрос'),
+    h('div', { class: 'page' }, h('div', { class: 'wrap' },
+      h('label', { class: 'sr', for: 'sbq' }, 'Вопрос'), q,
+      h('div', { class: 'row', style: 'margin-top:10px' }, gen, find, h('span', { class: 'muted', style: 'font-size:12px' }, 'Ctrl+Enter — с ответом. Ответ тратит лимит модели, поиск — нет.')),
+      out)));
+  if (q.value) run(false); else q.focus();
+}
+
+/* ═══ Проверки ═══ */
+function evalView(root) {
+  let cases = [], kbTitles = [], results = {}, editing = null, withModel = false, running = false;
+  const table = h('div'), formBox = h('div'), summary = h('span', { class: 'muted' });
+  const runBtn = h('button', { class: 'btn primary', onclick: runAll }, 'Прогнать все');
+  const modelChk = h('input', { type: 'checkbox', onchange: e => { withModel = e.target.checked; } });
+  root.append(head('Проверки', 'Типовые вопросы, на которых проверяем, что правки базы ничего не сломали',
+    [summary, h('label', { class: 'check', title: 'Проверка фактов в ответе требует вызова модели' }, modelChk, 'С ответами модели'), runBtn]),
+    h('div', { class: 'page' }, h('div', { class: 'wrap', style: 'max-width:980px' }, formBox, table)));
+
+  async function load() {
+    try { [{ items: cases }, { items: kbTitles }] = await Promise.all([api('/eval'), api('/kb')]); } catch (e) { return toast(e.message); }
+    paint();
+  }
+  function paintForm() {
+    const c = editing || { question: '', expect_topic: '', expect_text: '' };
+    const q = h('input', { type: 'text', value: c.question, maxlength: 2000, id: 'evq' });
+    const t = h('select', { id: 'evt' }, h('option', { value: '' }, 'Не проверять'), kbTitles.map(k => h('option', { value: k.title, selected: k.title === c.expect_topic }, k.title)));
+    const x = h('textarea', { rows: 3, id: 'evx', placeholder: 'Например: 10%\nHELLO', value: c.expect_text });
+    const err = h('div', { class: 'err', role: 'alert' });
+    const go = async () => {
+      if (!q.value.trim()) { err.textContent = 'Введите вопрос'; return; }
+      const body = { question: q.value, expect_topic: t.value, expect_text: x.value };
+      try { editing && editing.id ? await api('/eval/' + editing.id, { method: 'PUT', body }) : await api('/eval', { method: 'POST', body }); }
+      catch (e) { err.textContent = e.message; return; }
+      editing = null; formBox.replaceChildren(); toast('Сохранено'); load();
+    };
+    formBox.replaceChildren(h('div', { class: 'sec', style: 'margin-bottom:24px' }, h('h2', {}, editing && editing.id ? 'Изменить проверку' : 'Новая проверка'),
+      h('label', { class: 'f', for: 'evq', style: 'margin-top:0' }, 'Вопрос'), q,
+      h('div', { style: 'display:grid;grid-template-columns:1fr 1fr;gap:16px' },
+        h('div', {}, h('label', { class: 'f', for: 'evt' }, 'Должен найтись материал'), t),
+        h('div', {}, h('label', { class: 'f', for: 'evx' }, 'Ответ должен содержать (по одному в строке)'), x)),
+      h('div', { class: 'row', style: 'margin-top:14px' }, h('button', { class: 'btn primary', onclick: go }, 'Сохранить'), h('button', { class: 'btn ghost', onclick: () => { editing = null; formBox.replaceChildren(); paint(); } }, 'Отмена')), err));
+    q.focus();
+  }
+  function paint() {
+    if (!editing) formBox.replaceChildren();
+    const done = Object.values(results), passed = done.filter(r => r.ok === true).length;
+    summary.textContent = done.length ? `Пройдено ${passed} из ${done.filter(r => r.ok !== null).length}` : `${cases.length} ${plural(cases.length, 'проверка', 'проверки', 'проверок')}`;
+    table.replaceChildren(h('div', { class: 'row', style: 'margin-bottom:12px' }, h('button', { class: 'btn', onclick: () => { editing = {}; paintForm(); } }, 'Добавить проверку')),
+      cases.length ? h('table', {}, h('thead', {}, h('tr', {}, h('th', {}, 'Вопрос'), h('th', {}, 'Ожидаем'), h('th', {}, 'Результат'), h('th', {}))),
+        h('tbody', {}, cases.map(c => {
+          const r = results[c.id];
+          return h('tr', {}, h('td', {}, c.question),
+            h('td', { class: 'muted' }, [c.expect_topic ? h('div', {}, 'Материал: ' + c.expect_topic) : null, c.expect_text ? h('div', {}, 'Факты: ' + c.expect_text.split('\n').join(', ')) : null, !c.expect_topic && !c.expect_text ? '—' : null]),
+            h('td', {}, r ? [h('div', { class: 'res' + (r.ok === false ? ' bad' : '') }, r.ok === true ? '✓ Пройдено' : r.ok === false ? '✕ Не пройдено' : '— Не проверено'),
+              r.checks.map(k => h('div', { class: 'muted', style: 'font-size:12px' }, `${k.name} — ${k.detail}`))] : h('span', { class: 'muted' }, '—')),
+            h('td', { class: 'num' }, h('button', { class: 'btn ghost', onclick: () => { editing = c; paintForm(); } }, 'Изменить'), h('button', { class: 'btn ghost danger', onclick: async () => { await api('/eval/' + c.id, { method: 'DELETE' }).catch(e => toast(e.message)); delete results[c.id]; load(); } }, 'Удалить')));
+        }))) : h('div', { class: 'empty' }, 'Проверок пока нет. Их можно добавить отсюда или при исправлении ответа во «Входящих».'));
+  }
+  async function runAll() {
+    if (running || !cases.length) return; running = true; runBtn.disabled = true; results = {};
+    for (let i = 0; i < cases.length; i++) {
+      summary.textContent = `Проверяю ${i + 1} из ${cases.length}…`;
+      try { results[cases[i].id] = await api(`/eval/${cases[i].id}/run?answer=${withModel}`, { method: 'POST' }); }
+      catch (e) { results[cases[i].id] = { ok: false, checks: [{ name: 'Запуск', ok: false, detail: e.message }] }; }
+    }
+    running = false; runBtn.disabled = false; paint();
+  }
+  load();
+}
+
+/* ═══ Статистика ═══ */
+let statDays = 30;
+function statsView(root) {
+  const body = h('div', { class: 'wrap', style: 'max-width:980px' });
+  root.append(head('Статистика', null, seg([['7', '7 дней'], ['30', '30 дней'], ['90', '90 дней']], String(statDays), v => { statDays = +v; load(); })), h('div', { class: 'page' }, body));
+  async function load() {
+    let s; try { s = await api('/stats?days=' + statDays); } catch (e) { return body.replaceChildren(h('div', { class: 'err' }, e.message)); }
+    const rated = s.like + s.dislike, pct = rated ? Math.round(s.dislike / rated * 100) + '%' : '—';
+    const fig = (v, l) => h('div', { class: 'fig' }, h('div', { class: 'v' }, v), h('div', { class: 'l' }, l));
+    const max = Math.max(1, ...s.daily.map(d => d.count));
+    body.replaceChildren(
+      h('div', { class: 'figs' }, fig(s.total, 'Вопросов'), fig(s.lowconf, 'Без уверенного ответа'), fig(s.like, 'Лайков'), fig(s.dislike, 'Дизлайков' + (rated ? ` · ${pct} оценок` : '')), fig(s.csat_avg ?? '—', `Оценка диалога${s.csat_n ? ` (${s.csat_n})` : ''}`), fig(s.latency_ms ? (s.latency_ms / 1000).toFixed(1) + ' с' : '—', 'Среднее время ответа')),
+      s.daily.length ? h('div', { class: 'sec' }, h('h2', {}, 'Вопросы по дням (тёмное — дизлайки)'), h('div', { class: 'days' }, s.daily.map(d => h('div', { style: `height:${Math.max(3, d.count / max * 100)}%`, title: `${d.day}: ${d.count}, дизлайков ${d.bad}` }, d.bad ? h('i', { style: `height:${d.bad / d.count * 100}%` }) : null)))) : null,
+      h('div', { class: 'sec' }, h('h2', {}, 'Частые вопросы без уверенного ответа'),
+        s.unanswered.length ? h('table', {}, h('tbody', {}, s.unanswered.map(u => h('tr', {}, h('td', { style: 'width:100%' }, u.question), h('td', { class: 'num muted' }, '× ' + u.count),
+          h('td', { class: 'num' }, h('button', { class: 'btn ghost', onclick: () => { sandboxPrefill = u.question; location.hash = '#/sandbox'; } }, 'В песочницу')))))) : h('div', { class: 'muted' }, 'За период таких нет.')),
+      h('div', { class: 'sec' }, h('h2', {}, 'Причины дизлайков'),
+        s.dislike_reasons.length ? h('table', {}, h('tbody', {}, s.dislike_reasons.map(r => h('tr', {}, h('td', { style: 'width:100%' }, r.reason), h('td', { class: 'num muted' }, r.count))))) : h('div', { class: 'muted' }, 'Нет данных.')));
+  }
+  load();
+}
+
+const VIEWS = { inbox: inboxView, kb: kbView, sandbox: sandboxView, eval: evalView, stats: statsView };
+boot();
+</script>
+</body>
+</html>
