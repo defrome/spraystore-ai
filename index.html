@@ -905,16 +905,32 @@
     el.body.appendChild(wrap); scrollDown();
   }
 
-  function renderCards(ids) {
-    if (!ids?.length) return;
+  // ids — либо id из мок-словаря PRODUCTS, либо объекты товаров с сервера: {id, name, price, url, image?, in_stock}
+  const safeUrl = u => (typeof u === 'string' && /^https?:\/\//i.test(u)) ? u : '';
+  function renderCards(items) {
+    if (!items?.length) return;
     const wrap = document.createElement('div');
     wrap.className = 'cards';
-    ids.map(id => PRODUCTS[id]).filter(Boolean).forEach(p => {
+    items.forEach(it => {
       const a = document.createElement('a');
-      a.className = 'pcard'; a.href = CONFIG.links.catalog;
-      a.innerHTML = `<div class="img">${p.icon}</div><div class="n">${esc(p.name)}</div><div class="p">${p.price}<span>→</span></div>`;
+      a.className = 'pcard';
+      if (typeof it === 'string') {   // мок-режим как раньше
+        const p = PRODUCTS[it]; if (!p) return;
+        a.href = CONFIG.links.catalog;
+        a.innerHTML = `<div class="img">${p.icon}</div><div class="n">${esc(p.name)}</div><div class="p">${p.price}<span>→</span></div>`;
+      } else if (it && typeof it === 'object' && it.name) {   // реальный товар из каталога
+        const href = safeUrl(it.url), img = safeUrl(it.image);
+        a.href = href || CONFIG.links.catalog;
+        if (href) { a.target = '_blank'; a.rel = 'noopener noreferrer'; }
+        const price = typeof it.price === 'number' ? Math.round(it.price).toLocaleString('ru-RU') + ' ₽' : 'цена по запросу';
+        a.innerHTML = `<div class="img">${img ? `<img src="${esc(img)}" alt="" style="max-width:100%;max-height:100%;object-fit:contain;border-radius:10px">` : '🔫'}</div>` +
+          `<div class="n">${esc(String(it.name))}</div><div class="p">${esc(price)}<span>→</span></div>`;
+        const im = a.querySelector('img');
+        if (im) im.onerror = () => { im.parentNode.textContent = '🔫'; };
+      } else return;
       wrap.appendChild(a);
     });
+    if (!wrap.children.length) return;
     el.body.appendChild(wrap); scrollDown();
   }
 

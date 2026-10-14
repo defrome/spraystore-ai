@@ -240,7 +240,10 @@ def retrieve(question: str, k: int = 4) -> list[dict]:
     return hits
 
 MODEL = "deepseek-v4-1-flash"
-PROMPT_VERSION = "v1"   # менять при правках SYSTEM_PROMPT — попадает в лог для разбора дизлайков
+PROMPT_VERSION = "v2"   # менять при правках SYSTEM_PROMPT — попадает в лог для разбора дизлайков
+# context — ищем товары сами и кладём в контекст (предсказуемо, не требует tool calling у прокси);
+# tools — модель сама вызывает search_products; auto — пробуем tools, при ошибке API откатываемся на context
+CATALOG_MODE = os.getenv("CATALOG_MODE", "context").lower()
 
 SYSTEM_PROMPT = """Ты — умный ассистент интернет-магазина SprayStore (spraystore.ru).
 Отвечай вежливо, кратко, по делу, на русском языке.
@@ -248,12 +251,33 @@ SYSTEM_PROMPT = """Ты — умный ассистент интернет-ма�
 Если ответа в контексте нет — честно скажи: «У меня нет такой информации, уточните у оператора».
 Не выдумывай факты, цены и наличие товара.
 
+Рекомендации товаров:
+— Рекомендуй ТОЛЬКО товары из блока «Товары из каталога». Называй товар его полным названием, как в каталоге.
+— Цену и наличие бери только оттуда. Если у товара помечено «актуальность цены и наличия не проверена» — скажи об этом.
+— Кратко объясни, почему товар подходит под задачу клиента: опирайся на его характеристики и на статьи контекста
+  (подбор сопла и типа краскопульта под материал и т. п.).
+— Не больше 3 рекомендаций. Ссылку на товар давай, если она есть в данных.
+— Если подходящего товара в каталоге нет (блок пуст или не подходит под задачу или бюджет) — честно скажи об этом
+  и предложи уточнить у оператора. Не придумывай товары из головы.
+
 === КОНТЕКСТ ===
 {context}
 === КОНЕЦ КОНТЕКСТА ==="""
 
+TOOLS_NOTE = ("=== Товары из каталога ===\nТовары в контекст не загружены: чтобы найти товар, цену или наличие, "
+              "вызови функцию search_products. Рекомендуй только то, что она вернула.")
+
+
+def _messages(context: str, history, question: str) -> list[dict]:
+    messages = [{"role": "system", "content": SYSTEM_PROMPT.format(context=context)}]
+    if history:
+        messages.extend(history)
+    messages.append({"role": "user", "content": question})
+    return messages
+
+
 def answer(question: str, history: list | None = None, k: int = 4, debug: bool = False) -> dict:
-    """Возвращает {"text": ответ, "hits": найденные чанки}."""
+    """Возвращает {"text": ответ, "hits": найденные чанки, "products": товары каталога в контексте}."""
     hits = retrieve(question, k=k)
     if debug:
         for h in hits:
@@ -261,17 +285,43 @@ def answer(question: str, history: list | None = None, k: int = 4, debug: bool =
 
     context = "\n\n---\n\n".join(f"[{h['topic']}]\n{h['text']}" for h in hits)
 
-    messages = [{"role": "system", "content": SYSTEM_PROMPT.format(context=context)}]
-    if history:
-        messages.extend(history)
-    messages.append({"role": "user", "content": question})
+    products: list = []
+    text = None
+    catalog_on = False
+    try:
+        import kit_client
+        catalog_on = kit_client.is_enabled()   # нет токена — каталог выключен, всё как раньше
+    except Exception:
+        catalog_on = False
 
-    r = llm.chat.completions.create(
-        model=MODEL,
-        messages=messages,
-        temperature=0.3,
-    )
-    return {"text": r.choices[0].message.content, "hits": hits}
+    if catalog_on and CATALOG_MODE in ("tools", "auto"):
+        try:
+            import catalog_chat
+            text, products = catalog_chat.run_tool_loop(
+                llm, MODEL, _messages(context + "\n\n---\n\n" + TOOLS_NOTE, history, question))
+        except Exception as e:
+            if CATALOG_MODE == "tools":
+                raise
+            print(f"[catalog] tool calling не сработал ({e!r}), откат на режим context")
+            text, products = None, []
+
+    if text is None:
+        if catalog_on:
+            try:
+                import catalog_chat
+                products = catalog_chat.prepare_products(question, history)
+                if catalog_chat.is_product_query(question, history):
+                    context += "\n\n---\n\n" + catalog_chat.format_products_block(products)
+            except Exception as e:   # каталог не должен ронять чат
+                print(f"[catalog] поиск товаров не удался: {e!r}")
+                products = []
+        r = llm.chat.completions.create(
+            model=MODEL,
+            messages=_messages(context, history, question),
+            temperature=0.3,
+        )
+        text = r.choices[0].message.content
+    return {"text": text, "hits": hits, "products": products}
 
 def ask(question: str, history: list | None = None, k: int = 4, debug: bool = False) -> str:
     return answer(question, history, k=k, debug=debug)["text"]

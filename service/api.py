@@ -11,6 +11,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
+import catalog
+import catalog_chat
 import main as rag
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -23,7 +25,8 @@ CORS_ORIGINS = [o.strip() for o in os.getenv("CORS_ORIGINS", "*").split(",")]
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS messages (
     id TEXT PRIMARY KEY, session_id TEXT, ts REAL, question TEXT, answer TEXT,
-    model TEXT, prompt_version TEXT, sources TEXT, top_score REAL, confident INTEGER, latency_ms INTEGER
+    model TEXT, prompt_version TEXT, sources TEXT, top_score REAL, confident INTEGER, latency_ms INTEGER,
+    products TEXT
 );
 CREATE TABLE IF NOT EXISTS feedback (
     message_id TEXT PRIMARY KEY, session_id TEXT, value TEXT, reasons TEXT, comment TEXT,
@@ -45,12 +48,22 @@ def db():
         con.close()
 
 
+def migrate(con):
+    """Безопасная миграция уже созданной БД: добавляем новые nullable-колонки."""
+    cols = {r[1] for r in con.execute("PRAGMA table_info(messages)")}
+    if "products" not in cols:
+        con.execute("ALTER TABLE messages ADD COLUMN products TEXT")   # id рекомендованных товаров (JSON)
+
+
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     with db() as con:
         con.executescript(SCHEMA)
+        migrate(con)
     rag.build_index(force=False)
+    catalog.start_background_sync()   # без KIT_API_TOKEN ничего не делает
     yield
+    catalog.stop_background_sync()
 
 
 app = FastAPI(title="SprayStore RAG", lifespan=lifespan)
@@ -95,7 +108,7 @@ def to_llm_history(history: list[HistoryItem], message: str) -> list[dict]:
 
 @app.get("/api/health")
 def health():
-    return {"ok": True, "chunks": rag.get_collection().count()}
+    return {"ok": True, "chunks": rag.get_collection().count(), "catalog": {**catalog.status(), "products": catalog.count()}}
 
 
 @app.post("/api/chat")
@@ -109,7 +122,10 @@ def chat(req: ChatRequest):
 
     hits = res["hits"]
     top = max((h["score"] for h in hits), default=0.0)
-    confident = NO_INFO_MARK not in res["text"].lower() and top >= MIN_SCORE
+    # карточки — только товары, которые модель реально назвала в ответе
+    products = catalog_chat.mentioned_products(res["text"], res.get("products") or [])
+    # уверенность: статьи нашлись ИЛИ ответ опирается на товары каталога
+    confident = NO_INFO_MARK not in res["text"].lower() and (top >= MIN_SCORE or bool(products))
     sources = []
     if confident:
         for h in hits:
@@ -121,14 +137,19 @@ def chat(req: ChatRequest):
     try:
         with db() as con:
             con.execute(
-                "INSERT INTO messages VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                "INSERT INTO messages (id, session_id, ts, question, answer, model, prompt_version, sources,"
+                " top_score, confident, latency_ms, products) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
                 (message_id, req.session_id, started, req.message, res["text"], rag.MODEL, rag.PROMPT_VERSION,
                  json.dumps([h["topic"] for h in hits], ensure_ascii=False), top, int(confident),
-                 int((time.time() - started) * 1000)),
+                 int((time.time() - started) * 1000),
+                 json.dumps([p.id for p in products]) if products else None),
             )
     except Exception as e:   # лог не должен ронять ответ
         print(f"[log] не записали сообщение: {e!r}")
-    return {"text": res["text"], "confident": confident, "message_id": message_id, "sources": sources}
+    out = {"text": res["text"], "confident": confident, "message_id": message_id, "sources": sources}
+    if products:   # поле cards — только когда есть товары; формат {id, name, price, url, image?, in_stock}
+        out["cards"] = [p.to_card() for p in products]
+    return out
 
 
 @app.post("/api/feedback")

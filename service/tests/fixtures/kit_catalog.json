@@ -1,0 +1,40 @@
+{
+  "store": {"id": "s1", "slug": "demo", "b2c_url": "https://demo.kit.yandex.ru"},
+  "categories": [
+    {"id": "cat-1", "title": "Краскопульты", "parent_id": "", "status": "ACTIVE"},
+    {"id": "cat-2", "title": "Электрические", "parent_id": "cat-1", "status": "ACTIVE"},
+    {"id": "cat-3", "title": "Компрессоры", "parent_id": "", "status": "ACTIVE"}
+  ],
+  "characteristics": [
+    {"id": "ch-nozzle", "title": "Диаметр сопла", "unit": "мм"},
+    {"id": "ch-power", "title": "Мощность", "unit": "Вт"},
+    {"id": "ch-type", "title": "Тип", "unit": ""}
+  ],
+  "products": [
+    {"id": "prod-1", "category_ids": ["cat-2"]},
+    {"id": "prod-2", "category_ids": ["cat-2"]},
+    {"id": "prod-3", "category_ids": ["cat-3"]}
+  ],
+  "files": [
+    {"id": "img-1", "type": "IMAGE", "url": "https://cdn.example.com/a.jpg"},
+    {"id": "doc-1", "type": "OTHER", "url": "https://cdn.example.com/a.pdf"}
+  ],
+  "variants": [
+    {"id": "var-1", "sku": "W-590", "name": "Wagner FLEXiO 590 электрический краскопульт для лака", "brand": "Wagner",
+     "description": "<p>Для лаков и&nbsp;морилок, тонкий факел</p>", "status": "PUBLISHED", "product_id": "prod-1",
+     "relative_link_url": "/products/flexio-590",
+     "characteristics": [{"characteristic_id": "ch-nozzle", "value": "1.3", "values": ["1.3"]},
+                         {"characteristic_id": "ch-type", "values": ["HVLP", "электрический"]}],
+     "stocks": [{"warehouse_id": "w1", "quantity": 5, "reserved": 2}, {"warehouse_id": "w2", "quantity": 1, "reserved": 0}],
+     "media": [{"type": "IMAGE", "display_sequence": 2, "image_id": "missing"}, {"type": "IMAGE", "display_sequence": 1, "image_id": "img-1"}],
+     "pricing": {"price": "12990.00", "final_price": "9990.50"}},
+    {"id": "var-2", "sku": "T-800", "name": "TecMaster 800 электрический краскопульт для водоэмульсионной краски и забора", "status": "PUBLISHED",
+     "product_id": "prod-2", "relative_link_url": "products/tm-800",
+     "characteristics": [{"characteristic_id": "ch-nozzle", "values": ["2.6"]}, {"characteristic_id": "ch-power", "values": ["800"]}],
+     "stocks": [{"warehouse_id": "w1", "quantity": 3, "reserved": 3}],
+     "pricing": {"price": "7490"}},
+    {"id": "var-3", "sku": "C-50", "name": "Компрессор Aeropro 50 л масляный", "status": "PUBLISHED", "product_id": "prod-3",
+     "stocks": [{"warehouse_id": "w1", "quantity": 10, "reserved": 0}],
+     "pricing": {"price": "25000", "promotion_price": "22000"}}
+  ]
+}

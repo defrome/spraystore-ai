@@ -4,3 +4,4 @@ chromadb
 openai
 sentence-transformers
 python-dotenv
+httpx
