@@ -86,9 +86,10 @@
   .ss-chat[data-mode="connecting"] .ss-mode-bar::after { width: 40%; animation: loadbar 1.4s var(--ease) infinite; }
   .ss-chat[data-mode="operator"] .ss-mode-bar::after { width: 100%; background: var(--green); }
 
+  .ss-bodywrap { flex: 1; min-height: 0; position: relative; display: flex; flex-direction: column; }
   .ss-body {
-    flex: 1; overflow-y: auto; padding: 24px var(--gutter) 8px; background: var(--paper);
-    scroll-behavior: smooth; overscroll-behavior: contain;
+    flex: 1; min-height: 0; overflow-y: auto; padding: 24px var(--gutter) 8px; background: var(--paper);
+    overscroll-behavior: contain;
   }
   .ss-body::-webkit-scrollbar { width: 6px; }
   .ss-body::-webkit-scrollbar-thumb { background: #dcd9d2; border-radius: 3px; }
@@ -130,24 +131,81 @@
   .typing .think.swap { animation: thinkShimmer 1.8s linear infinite, thinkIn .35s var(--ease); }
   .typing .dots::after { content: ""; animation: dots 1.4s steps(4, end) infinite; }
 
-  /* streaming + feedback */
+  /* streaming + rich text */
   .bubble.streaming::after {
     content: ""; display: inline-block; width: 7px; height: 14px; margin-left: 2px; vertical-align: -2px;
     background: var(--yellow-deep); border-radius: 2px; animation: caret .9s steps(2, start) infinite;
   }
-  .bubble.streaming .meta, .bubble.streaming .fb { visibility: hidden; }
-  .fb { display: flex; align-items: center; gap: 2px; margin: 6px -6px -4px; animation: msgIn .35s var(--ease) both; }
-  .fb button {
+  .bubble ul, .bubble ol { margin: 6px 0; padding-left: 20px; }
+  .bubble li { margin: 2px 0; }
+  .bubble .sp { height: 6px; }
+  .bubble a { color: inherit; font-weight: 600; text-decoration: underline; text-decoration-color: var(--yellow-deep); text-decoration-thickness: 2px; text-underline-offset: 2px; }
+  .bubble code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; background: var(--paper); padding: 1px 5px; border-radius: 5px; }
+  .msg.user .bubble code { background: rgba(255,255,255,.14); }
+  .code { margin: 8px 0; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: var(--paper); }
+  .code-h { display: flex; justify-content: space-between; align-items: center; padding: 3px 4px 3px 10px; font-size: 11px; color: var(--muted); border-bottom: 1px solid var(--line); background: #fff; }
+  .code-h button { border: 0; background: none; font: inherit; font-size: 11px; font-weight: 700; color: var(--ink); cursor: pointer; padding: 5px 8px; border-radius: 6px; }
+  .code-h button:hover { background: var(--paper); }
+  .code pre { margin: 0; padding: 10px; overflow-x: auto; }
+  .code pre code { background: none; padding: 0; }
+  .src { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; margin-top: 8px; font-size: 11.5px; color: var(--muted); }
+  .bubble .src a, .src .s { border: 1px solid var(--line); background: var(--paper); border-radius: 999px; padding: 2px 8px; color: var(--ink); text-decoration: none; font-weight: 600; }
+
+  /* ошибки */
+  .msg.err .ava { background: #c0392b; color: #fff; }
+  .msg.err .bubble { border-color: #f0c9c4; background: #fff6f5; }
+  .err-act { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+  .err-act button { border: 0; font: inherit; font-size: 12.5px; font-weight: 700; padding: 8px 12px; border-radius: 9px; cursor: pointer; background: var(--ink); color: #fff; }
+  .err-act button.ghost { background: none; color: var(--ink); border: 1px solid var(--line); }
+
+  /* оценка ответа */
+  .fb { margin: 8px -6px -4px; animation: msgIn .35s var(--ease) both; }
+  .fb-row { display: flex; align-items: center; gap: 2px; opacity: .45; transition: opacity .2s; }
+  .msg:hover .fb-row, .fb:focus-within .fb-row, .fb-row.has-state { opacity: 1; }
+  @media (hover: none) { .fb-row { opacity: 1; } }
+  .fb-row > button {
     border: 0; background: none; color: #a6a298; padding: 5px 6px; border-radius: 8px; cursor: pointer;
-    display: grid; place-items: center; transition: color .15s, background .15s, transform .2s var(--spring);
+    display: grid; place-items: center; position: relative; transition: color .15s, background .15s;
   }
-  .fb button:hover { color: var(--ink); background: var(--paper); }
-  .fb button:active { transform: scale(.88); }
-  .fb button.on { color: var(--ink); background: var(--yellow); }
-  .fb button.on.bad { color: #fff; background: var(--ink); }
-  .fb button svg { width: 15px; height: 15px; }
+  .fb-row > button[hidden] { display: none; }
+  .fb-row > button:hover { color: var(--ink); background: var(--paper); }
+  .fb-row > button svg { width: 16px; height: 16px; fill: transparent; transition: fill .2s var(--ease); }
+  .fb-row > button[aria-pressed="true"] { color: var(--ink); background: var(--yellow); }
+  .fb-row > button.bad[aria-pressed="true"] { color: #fff; background: var(--ink); }
+  .fb-row > button[aria-pressed="true"] svg { fill: currentColor; }
+  .fb-row > button.pop { animation: fbPop .3s var(--spring); }
+  .fb-row > button.bad.pop { animation: fbPopSoft .3s var(--ease); }
+  .fb-row > button.pop:not(.bad)[data-v="like"]::after {
+    content: ""; position: absolute; inset: 0; border-radius: 8px; border: 2px solid var(--yellow-deep);
+    animation: fbRing .45s var(--ease) both; pointer-events: none;
+  }
   .fb .sep { flex: 1; }
   .fb .note { font-size: 11.5px; color: var(--muted); margin-left: 6px; animation: msgIn .3s var(--ease) both; }
+  .fb .note:empty { display: none; }
+  .fb .note .lnk { border: 0; background: none; font: inherit; color: var(--ink); font-weight: 700; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; padding: 2px 0; }
+
+  .fb-panel {
+    display: grid; grid-template-rows: 0fr; opacity: 0; visibility: hidden;
+    transition: grid-template-rows .22s var(--ease), opacity .2s, visibility 0s linear .22s;
+  }
+  .fb-panel.open { grid-template-rows: 1fr; opacity: 1; visibility: visible; transition: grid-template-rows .22s var(--ease), opacity .2s, visibility 0s; }
+  .fb-panel > div { overflow: hidden; min-height: 0; min-width: min(280px, 64vw); }
+  .fb-panel h5 { font-size: 12px; font-weight: 700; margin: 10px 6px 6px; }
+  .fb-panel .rs { display: flex; flex-wrap: wrap; gap: 5px; padding: 0 6px; }
+  .fb-panel .rs button {
+    border: 1px solid var(--line); background: #fff; color: var(--ink); font: inherit; font-size: 12px; font-weight: 600;
+    padding: 6px 10px; border-radius: 999px; cursor: pointer; transition: background .15s, color .15s, border-color .15s;
+  }
+  .fb-panel .rs button:hover { border-color: var(--ink); }
+  .fb-panel .rs button[aria-pressed="true"] { background: var(--ink); color: #fff; border-color: var(--ink); }
+  .fb-panel textarea {
+    display: block; width: calc(100% - 12px); margin: 8px 6px 0; border: 1px solid var(--line); border-radius: 10px;
+    padding: 8px 10px; font: inherit; font-size: 12.5px; line-height: 1.4; resize: none; background: var(--paper); outline: 0; color: var(--ink);
+  }
+  .fb-panel textarea:focus { border-color: var(--ink); background: #fff; }
+  .fb-panel .pa { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 8px 6px 4px; }
+  .fb-panel .go { border: 0; background: var(--ink); color: #fff; font: inherit; font-size: 12px; font-weight: 700; padding: 8px 14px; border-radius: 9px; cursor: pointer; }
+  .fb-panel .human { border: 0; background: none; font: inherit; font-size: 12px; font-weight: 700; color: var(--ink); text-decoration: underline; text-underline-offset: 2px; cursor: pointer; padding: 8px 2px; margin-left: auto; }
 
   /* Quick replies */
   .chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 12px 34px; animation: msgIn .5s var(--ease) both; }
@@ -227,6 +285,7 @@
     transition: transform .25s var(--spring), opacity .2s, background .2s;
   }
   .send:disabled { opacity: .25; cursor: default; }
+  .send.stop { background: var(--yellow); color: var(--ink); }
   .send:not(:disabled):hover { transform: scale(1.06) rotate(-8deg); }
   .ss-hint { display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: #a5a29b; margin-top: 8px; padding: 0 4px; }
   .ss-hint .dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--yellow); margin-right: 6px; vertical-align: 1px; transition: background .3s; }
@@ -238,6 +297,32 @@
   .ss-hint button[hidden] { display: none; }
   .ss-hint button { border: 0; background: none; font: inherit; color: var(--ink); font-weight: 700; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
 
+  /* «↓ новые сообщения» */
+  .ss-jump {
+    position: absolute; left: 50%; bottom: 12px; transform: translate(-50%, 8px); opacity: 0; pointer-events: none;
+    background: var(--ink); color: #fff; border: 0; font: inherit; font-size: 12.5px; font-weight: 700; padding: 9px 14px;
+    border-radius: 999px; box-shadow: 0 10px 24px -10px rgba(0,0,0,.5); cursor: pointer; transition: opacity .2s, transform .3s var(--spring);
+  }
+  .ss-jump.show { opacity: 1; pointer-events: auto; transform: translate(-50%, 0); }
+
+  /* оценка диалога (CSAT) */
+  .csat {
+    position: absolute; left: 0; right: 0; bottom: 0; z-index: 5; background: #fff; border-top: 1px solid var(--line);
+    padding: 18px var(--gutter) max(18px, env(safe-area-inset-bottom)); box-shadow: 0 -20px 50px -20px rgba(0,0,0,.3);
+    text-align: center; transform: translateY(100%); transition: transform .35s var(--spring);
+  }
+  .csat.show { transform: none; }
+  .csat h4 { font-size: 15px; font-weight: 800; }
+  .csat p { font-size: 12.5px; color: var(--muted); margin-top: 4px; }
+  .stars { display: flex; justify-content: center; gap: 2px; margin: 10px 0 4px; }
+  .stars button { width: 44px; height: 44px; border: 0; background: none; cursor: pointer; font-size: 30px; line-height: 1; color: #d9d5cb; transition: color .15s, transform .2s var(--spring); }
+  .stars button.on { color: var(--yellow-deep); }
+  .stars button:hover { transform: scale(1.15); }
+  .csat .skip { border: 0; background: none; font: inherit; font-size: 12px; color: var(--muted); text-decoration: underline; cursor: pointer; padding: 10px; }
+
+  .ss-disc { margin: 6px 4px 0; font-size: 10.5px; line-height: 1.35; color: #a5a29b; text-align: center; }
+  button:focus-visible, a:focus-visible, .chip:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+
   /* ---------- Animations ---------- */
   @keyframes pageIn { from { opacity: 0; } }
   @keyframes float { 50% { transform: translateY(-6px) rotate(-2deg); } }
@@ -245,6 +330,9 @@
   @keyframes msgIn { from { opacity: 0; transform: translateY(10px) scale(.98); } }
   @keyframes popIn { from { opacity: 0; transform: translateY(14px) scale(.94); } }
   @keyframes bounce { 0%, 60%, 100% { transform: translateY(0); opacity: .5; } 30% { transform: translateY(-5px); opacity: 1; } }
+  @keyframes fbPop { 0% { transform: scale(1); } 45% { transform: scale(1.25); } 100% { transform: scale(1); } }
+  @keyframes fbPopSoft { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
+  @keyframes fbRing { from { opacity: .7; transform: scale(.8); } to { opacity: 0; transform: scale(1.7); } }
   @keyframes sparkSpin { to { transform: rotate(360deg); } }
   @keyframes sparkPulse { 0%, 100% { scale: .8; } 50% { scale: 1.15; } }
   @keyframes thinkShimmer { to { background-position: -250% 0; } }
@@ -270,6 +358,15 @@
     .ss-starters { grid-template-columns: 1fr; }
     .chips, .cards, .handoff, .connecting { margin-left: 0; }
   }
+  /* Тач-устройства: цели нажатия ≥ 44px */
+  @media (pointer: coarse) {
+    .fb-row > button { min-width: 44px; min-height: 44px; }
+    .fb-panel .rs button, .fb-panel .go, .fb-panel .human, .err-act button, .code-h button { min-height: 44px; }
+    .chip { min-height: 44px; }
+    .send { width: 44px; height: 44px; }
+    .ss-hint button { min-height: 44px; }
+    .composer textarea { font-size: 16px; }   /* iOS не зумит поле при фокусе */
+  }
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
   }
@@ -282,7 +379,10 @@
   <main class="ss-chat" id="ssChat" data-mode="ai" aria-label="Чат поддержки SprayStore">
     <div class="ss-mode-bar"></div>
 
-    <div class="ss-body" id="ssBody" aria-live="polite"></div>
+    <div class="ss-bodywrap">
+      <div class="ss-body" id="ssBody" role="log" aria-live="polite" aria-label="Переписка"></div>
+      <button class="ss-jump" id="ssJump" type="button">↓ Новые сообщения</button>
+    </div>
 
     <footer class="ss-foot">
       <form class="composer" id="ssForm">
@@ -292,12 +392,13 @@
         </button>
       </form>
       <div class="ss-hint">
-        <span><i class="dot"></i><span id="ssHintText">ИИ-помощник</span></span>
+        <span><i class="dot"></i><span id="ssHintText">ИИ-помощник · онлайн</span></span>
         <span class="acts">
           <button type="button" id="ssHumanLink">Позвать человека</button>
           <button type="button" id="ssReset" title="Новый диалог" aria-label="Новый диалог"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg></button>
         </span>
       </div>
+      <p class="ss-disc">Отвечает ИИ, возможны неточности. Оценки и диалоги сохраняются для улучшения сервиса.</p>
     </footer>
   </main>
 </div>
@@ -317,8 +418,13 @@
     storageKey: 'ss_chat_v1',
     ai: {
       endpoint: '/api/chat',   // RAG-сервис (service/api.py); null — вернуться на мок
+      feedbackEndpoint: '/api/feedback',
+      csatEndpoint: '/api/csat',
+      timeoutMs: 30000,       // дольше — показываем ошибку с «Повторить»
       typingSpeed: [600, 1400]
     },
+    csatRate: 0.4,            // доля диалогов, где при «Новом диалоге» просим оценку 1–5
+    csatMinUserMsgs: 2,
     operator: {
       endpoint: null,         // напр. 'wss://support.spraystore.ru/ws' — если null, мок
       name: 'Анна',
@@ -336,18 +442,27 @@
    * ===================================================================== */
   const AIProvider = {
     /** @returns {Promise<{text:string, chips?:string[], cards?:object[], confident?:boolean}>} */
-    async reply(text, history) {
+    async reply(text, history, signal) {
       if (CONFIG.ai.endpoint) {
         const r = await fetch(CONFIG.ai.endpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ message: text, history })
+          body: JSON.stringify({
+            message: text, session_id: state.sessionId,
+            history: history.map(h => ({ role: h.role, text: h.text }))
+          }),
+          signal
         });
+        if (!r.ok) throw new Error('http ' + r.status);
         return r.json();
       }
       return MockAI.answer(text);
     }
   };
+
+  const postJSON = (url, body) => fetch(url, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), keepalive: true
+  }).then(r => { if (!r.ok) throw new Error('http ' + r.status); });
 
   const OperatorProvider = {
     listeners: [],
@@ -467,6 +582,8 @@
     mode: 'ai',            // 'ai' | 'connecting' | 'operator'
     userCount: 0,          // кол-во вопросов в режиме ИИ
     lowConfidence: 0,      // сколько раз ИИ «не понял»
+    sessionId: (crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2, 10)),
+    csatDone: false,
     nextOfferAt: CONFIG.handoffAfter,
     operator: null,
     history: []            // {role, text, ts, extra?}
@@ -480,7 +597,57 @@
   const rand = ([a, b]) => a + Math.random() * (b - a);
   const time = ts => new Date(ts).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
   const esc = s => s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const md = s => esc(s).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/\n/g, '<br>');
+  const uid = () => (crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2, 10));
+  const SEND_ICON = el.send.innerHTML;
+  const STOP_ICON = '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2.5"/></svg>';
+  let busy = false;          // идёт генерация ответа
+  let gen = null;            // { ctrl, stopped, timedOut } текущего запроса
+  let stick = true;          // лента прижата к низу → автоскролл
+  let hasNew = false;
+
+  /** Мини-markdown: **жирный**, `код`, ```блоки```, списки, ссылки */
+  function md(src) {
+    const codes = [];
+    let t = src.replace(/```([\w+-]*)[ \t]*\n?([\s\S]*?)(?:```|$)/g, (_, lang, code) => {
+      codes.push({ lang, code: code.replace(/\n$/, '') });
+      return `\n\u0000${codes.length - 1}\u0000\n`;
+    });
+    t = esc(t)
+      .replace(/`([^`\n]+)`/g, '<code>$1</code>')
+      .replace(/\*\*(.+?)\*\*/g, '<b>$1</b>')
+      .replace(/\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>')
+      .replace(/(^|[\s(])(https?:\/\/[^\s<)]+)/g, '$1<a href="$2" target="_blank" rel="noopener noreferrer">$2</a>');
+    const out = []; let list = null;
+    const closeList = () => { if (list) { out.push(`</${list}>`); list = null; } };
+    const openList = tag => { if (list !== tag) { closeList(); out.push(`<${tag}>`); list = tag; } };
+    for (const line of t.split('\n')) {
+      let m;
+      if ((m = line.match(/^\s*[-*•—–]\s+(.*)$/))) { openList('ul'); out.push(`<li>${m[1]}</li>`); }
+      else if ((m = line.match(/^\s*\d+[.)]\s+(.*)$/))) { openList('ol'); out.push(`<li>${m[1]}</li>`); }
+      else {
+        closeList();
+        const c = line.match(/^\u0000(\d+)\u0000$/);
+        if (c) {
+          const { lang, code } = codes[+c[1]];
+          out.push(`<div class="code"><div class="code-h"><span>${esc(lang || 'код')}</span><button type="button">Копировать</button></div><pre><code>${esc(code)}</code></pre></div>`);
+        } else if (!line.trim()) { if (out.length && out[out.length - 1] !== '<div class="sp"></div>') out.push('<div class="sp"></div>'); }
+        else out.push(line + '<br>');
+      }
+    }
+    closeList();
+    return out.join('').replace(/<br>(?=<(?:ul|ol|div)|$)/g, '');
+  }
+
+  async function copyText(t) {
+    try { await navigator.clipboard.writeText(t); }
+    catch (e) {   // в iframe без разрешения clipboard API недоступен
+      const ta = document.createElement('textarea');
+      ta.value = t; ta.style.cssText = 'position:fixed;opacity:0';
+      document.body.appendChild(ta); ta.select();
+      try { document.execCommand('copy'); } catch (_) {}
+      ta.remove();
+    }
+  }
 
   /* ---------- Persist ---------- */
   function save() {
@@ -497,7 +664,27 @@
   /* =====================================================================
    *  РЕНДЕР
    * ===================================================================== */
-  function scrollDown() { requestAnimationFrame(() => el.body.scrollTop = el.body.scrollHeight); }
+  const jump = $('ssJump');
+  el.body.addEventListener('scroll', () => {
+    stick = el.body.scrollHeight - el.body.scrollTop - el.body.clientHeight < 80;
+    if (stick) hasNew = false;
+    jump.classList.toggle('show', !stick && hasNew);
+  });
+  /** Автоскролл только если пользователь внизу; иначе показываем «↓ Новые сообщения» */
+  function scrollDown(force) {
+    requestAnimationFrame(() => {
+      if (force === true || stick) { el.body.scrollTop = el.body.scrollHeight; stick = true; hasNew = false; jump.classList.remove('show'); }
+      else { hasNew = true; jump.classList.add('show'); }
+    });
+  }
+  jump.onclick = () => el.body.scrollTo({ top: el.body.scrollHeight, behavior: 'smooth' });
+  el.body.addEventListener('click', e => {   // «Копировать» в блоках кода
+    const b = e.target.closest('.code-h button');
+    if (!b) return;
+    copyText(b.closest('.code').querySelector('code').textContent);
+    b.textContent = 'Скопировано ✓';
+    setTimeout(() => { b.textContent = 'Копировать'; }, 1500);
+  });
 
   function lastSender() {
     const last = el.body.lastElementChild;
@@ -505,57 +692,171 @@
   }
 
   const ICONS = {
-    like: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 10v11H3V10h4zM7 10l4-8a2.5 2.5 0 0 1 2.5 2.5V8H19a2 2 0 0 1 2 2.3l-1.2 7.5A2 2 0 0 1 17.8 19H7"/></svg>',
-    dislike: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 14V3h4v11h-4zM17 14l-4 8a2.5 2.5 0 0 1-2.5-2.5V16H5a2 2 0 0 1-2-2.3l1.2-7.5A2 2 0 0 1 6.2 5H17"/></svg>',
-    flag: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 21V4M5 4h11l-2 4 2 4H5"/></svg>'
+    like: '<svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 10v11H3V10h4zM7 10l4-8a2.5 2.5 0 0 1 2.5 2.5V8H19a2 2 0 0 1 2 2.3l-1.2 7.5A2 2 0 0 1 17.8 19H7"/></svg>',
+    dislike: '<svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 14V3h4v11h-4zM17 14l-4 8a2.5 2.5 0 0 1-2.5-2.5V16H5a2 2 0 0 1-2-2.3l1.2-7.5A2 2 0 0 1 6.2 5H17"/></svg>',
+    flag: '<svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 21V4M5 4h11l-2 4 2 4H5"/></svg>',
+    copy: '<svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2.5"/><path d="M5 15V5.5A2.5 2.5 0 0 1 7.5 3H15"/></svg>',
+    regen: '<svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.6-5.9L20 8"/><path d="M20 3v5h-5"/></svg>'
   };
-  const FB_NOTES = { like: 'Спасибо за оценку!', dislike: 'Спасибо, учтём', reported: 'Жалоба отправлена' };
+  const REASONS = {
+    dislike: ['Неверный ответ', 'Не по теме', 'Устаревшая информация', 'Непонятно', 'Грубый тон', 'Другое'],
+    report: ['Оскорбительный ответ', 'Небезопасный совет', 'Личные данные', 'Другое']
+  };
 
-  /** Кнопки 👍 👎 🚩 — заглушки: событие уходит в родителя через postMessage, на сервер пока ничего не шлём */
+  /** Оценка уходит в /api/feedback; без бэкенда (мок) — только локальное состояние */
+  function sendFeedback(item) {
+    if (!CONFIG.ai.endpoint) return Promise.resolve();
+    const f = item.fb, idx = state.history.indexOf(item);
+    return postJSON(CONFIG.ai.feedbackEndpoint, {
+      message_id: item.id, session_id: state.sessionId, value: f.v, reasons: f.reasons, comment: f.comment,
+      escalated: !!f.escalated, user_msgs_before: state.history.slice(0, idx + 1).filter(h => h.role === 'user').length
+    });
+  }
+
   function renderFeedback(item) {
+    if (typeof item.fb === 'string') item.fb = { v: item.fb === 'reported' ? 'report' : item.fb, reasons: [], comment: '' };
+    const f = item.fb = item.fb || { v: null, reasons: [], comment: '' };
     const fb = document.createElement('div');
     fb.className = 'fb';
     fb.innerHTML = `
-      <button type="button" data-v="like" title="Хороший ответ" aria-label="Хороший ответ">${ICONS.like}</button>
-      <button type="button" data-v="dislike" class="bad" title="Плохой ответ" aria-label="Плохой ответ">${ICONS.dislike}</button>
-      <span class="sep"></span>
-      <button type="button" data-v="reported" title="Пожаловаться" aria-label="Пожаловаться">${ICONS.flag}</button>`;
+      <div class="fb-row" role="group" aria-label="Оценка ответа">
+        <button type="button" data-v="like" title="Полезный ответ" aria-label="Полезный ответ">${ICONS.like}</button>
+        <button type="button" data-v="dislike" class="bad" title="Неполезный ответ" aria-label="Неполезный ответ">${ICONS.dislike}</button>
+        <button type="button" data-a="copy" title="Копировать" aria-label="Копировать ответ">${ICONS.copy}</button>
+        <button type="button" data-a="regen" title="Сгенерировать заново" aria-label="Сгенерировать заново" hidden>${ICONS.regen}</button>
+        <span class="note" role="status"></span><span class="sep"></span>
+        <button type="button" data-v="report" title="Пожаловаться" aria-label="Пожаловаться">${ICONS.flag}</button>
+      </div>
+      <div class="fb-panel" inert><div></div></div>`;
+    const row = fb.querySelector('.fb-row'), note = fb.querySelector('.note');
+    const panel = fb.querySelector('.fb-panel'), inner = panel.firstElementChild;
+
     const paint = () => {
-      fb.querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.v === item.fb));
-      fb.querySelector('.note')?.remove();
-      if (item.fb) {
-        const n = document.createElement('span'); n.className = 'note'; n.textContent = FB_NOTES[item.fb];
-        fb.insertBefore(n, fb.querySelector('.sep'));
+      fb.querySelectorAll('[data-v]').forEach(b => b.setAttribute('aria-pressed', String(f.v === b.dataset.v)));
+      row.classList.toggle('has-state', !!f.v);
+    };
+    const setNote = (t, linkLabel, linkFn) => {
+      note.textContent = t || '';
+      if (t && linkLabel) {
+        const b = document.createElement('button');
+        b.type = 'button'; b.className = 'lnk'; b.textContent = linkLabel; b.onclick = linkFn;
+        note.append(' ', b);
       }
     };
-    fb.querySelectorAll('button').forEach(b => b.onclick = () => {
-      const v = b.dataset.v;
-      item.fb = item.fb === v ? null : v;   // повторный клик снимает оценку
-      // TODO: отправить на сервер, напр. fetch('/api/feedback', { method:'POST', body: JSON.stringify({ text: item.text, value: item.fb }) })
-      emit('feedback', { value: item.fb, text: item.text });
-      save(); paint();
+    const closePanel = () => { panel.classList.remove('open'); panel.inert = true; };
+    const likeNote = () => setNote('Спасибо!', 'Добавить комментарий', () => openPanel('like'));
+
+    function openPanel(mode) {
+      const reasons = REASONS[mode];
+      setNote('');
+      inner.innerHTML = `
+        <h5>${mode === 'like' ? 'Что понравилось? Необязательно' : mode === 'dislike' ? 'Что пошло не так?' : 'На что жалуетесь?'}</h5>
+        ${reasons ? `<div class="rs">${reasons.map(r => `<button type="button" aria-pressed="${f.reasons.includes(r)}">${esc(r)}</button>`).join('')}</div>` : ''}
+        <textarea rows="2" maxlength="1000" placeholder="${mode === 'like' ? 'Комментарий' : 'Расскажите подробнее (необязательно)'}" aria-label="Комментарий">${esc(f.comment)}</textarea>
+        <div class="pa"><button type="button" class="go">Отправить</button>${mode === 'dislike' ? '<button type="button" class="human">Позвать человека</button>' : ''}</div>`;
+      const ta = inner.querySelector('textarea');
+      inner.querySelectorAll('.rs button').forEach(b => b.onclick = () => {
+        const r = b.textContent, on = !f.reasons.includes(r);
+        f.reasons = on ? [...f.reasons, r] : f.reasons.filter(x => x !== r);
+        b.setAttribute('aria-pressed', String(on));
+      });
+      const submitPanel = () => { f.comment = ta.value.trim(); save(); sendFeedback(item).catch(() => {}); closePanel(); };
+      inner.querySelector('.go').onclick = () => { submitPanel(); setNote(mode === 'like' ? 'Спасибо!' : 'Спасибо, это поможет улучшить ответы'); };
+      const human = inner.querySelector('.human');
+      if (human) human.onclick = () => { f.escalated = true; submitPanel(); setNote('Подключаем специалиста…'); startHandoff(); };
+      panel.inert = false; panel.classList.add('open');
+      scrollDown(); setTimeout(scrollDown, 260);   // и после раскрытия панели
+    }
+
+    fb.querySelectorAll('[data-v]').forEach(b => b.onclick = () => {
+      const v = b.dataset.v, prev = JSON.stringify(f);
+      f.reasons = []; f.comment = ''; f.escalated = false;
+      f.v = f.v === v ? null : v;              // повторный клик снимает оценку
+      paint();
+      if (f.v) {
+        b.classList.remove('pop'); void b.offsetWidth; b.classList.add('pop');
+        if (matchMedia('(pointer: coarse)').matches) navigator.vibrate?.(10);
+      }
+      if (f.v === 'like') { closePanel(); likeNote(); }
+      else if (f.v) openPanel(f.v);            // дизлайк / жалоба → причины
+      else { closePanel(); setNote(''); }
+      save();
+      // оптимистично: UI уже обновлён, при ошибке запроса тихо откатываем
+      sendFeedback(item).catch(() => { Object.assign(f, JSON.parse(prev)); paint(); closePanel(); setNote(''); save(); });
     });
+    fb.querySelector('[data-a="copy"]').onclick = async () => {
+      await copyText(item.text);
+      setNote('Скопировано ✓');
+      setTimeout(() => { if (note.textContent.startsWith('Скопировано')) f.v === 'like' ? likeNote() : setNote(''); }, 1500);
+    };
+    fb.querySelector('[data-a="regen"]').onclick = () => regenerate(item, fb.closest('.msg'));
+
     paint();
+    if (f.v === 'like') setNote('Спасибо!');
     return fb;
   }
 
-  /** Плавная «печать» ответа: слово за словом, общая длительность ограничена */
-  async function streamInto(bubble, text, metaHtml, fb) {
-    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    const parts = text.match(/\s+|\S+/g) || [];
+  /** «Сгенерировать заново»: убираем последний ответ и спрашиваем ту же реплику ещё раз */
+  function regenerate(item, node) {
+    if (busy) return;
+    const i = state.history.indexOf(item);
+    const q = state.history.slice(0, i).reverse().find(h => h.role === 'user');
+    if (i < 0 || !q) return;
+    state.history.splice(i, 1);
+    for (let n = node.nextElementSibling; n && n.matches('.chips, .cards');) { const nx = n.nextElementSibling; n.remove(); n = nx; }
+    node.remove();
+    save();
+    stick = true;
+    ask(q.text);
+  }
+
+  /** «Заново» доступно только у последнего ответа ИИ и пока не идёт генерация */
+  function refreshRegen() {
+    el.body.querySelectorAll('[data-a="regen"]').forEach(b => { b.hidden = true; });
+    const last = [...el.body.querySelectorAll('.msg.bot')].pop();
+    const btn = last && last.querySelector('[data-a="regen"]');
+    if (btn && !busy) btn.hidden = false;
+  }
+
+  const srcHtml = list => !list?.length ? '' :
+    `<div class="src"><span>Источники:</span>${list.map(x => {
+      const title = esc(String(x.title).replace(/^./, c => c.toUpperCase()));
+      return /^https?:\/\//.test(x.url || '') ? `<a href="${esc(x.url)}" target="_blank" rel="noopener noreferrer">${title}</a>` : `<span class="s">${title}</span>`;
+    }).join('')}</div>`;
+
+  /** Плавная «печать» ответа: слово за словом; кнопка «Остановить» обрывает её на текущем месте */
+  async function streamInto(bubble, item, tail, fb) {
+    const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const parts = item.text.match(/\s+|\S+/g) || [];
     const tick = 32, maxMs = 3500;
     const step = Math.max(1, Math.ceil(parts.length / (maxMs / tick)));
+    const g = gen;
+    let shown = parts.length;
     bubble.classList.add('streaming');
+    bubble.setAttribute('aria-busy', 'true');
     for (let i = 0; i < parts.length && !reduce; i += step) {
+      if (g?.stopped || !bubble.isConnected) { shown = i; break; }
       let part = parts.slice(0, i + step).join('');
       if ((part.match(/\*\*/g) || []).length % 2) part += '**';   // не мигать незакрытым **
       bubble.innerHTML = md(part);
       scrollDown();
       await wait(tick + Math.random() * 18);
     }
-    bubble.innerHTML = md(text) + metaHtml;
+    if (shown < parts.length) {
+      item.text = parts.slice(0, shown).join('').trimEnd();
+      item.stopped = true;
+      if (!item.text) {   // остановили до первого слова — ответа как бы не было
+        bubble.closest('.msg')?.remove();
+        const i = state.history.indexOf(item);
+        if (i >= 0) state.history.splice(i, 1);
+        save(); return;
+      }
+      save();
+    }
+    bubble.innerHTML = md(item.text) + tail();
     if (fb) bubble.appendChild(fb);
     bubble.classList.remove('streaming');
+    bubble.removeAttribute('aria-busy');
     scrollDown();
   }
 
@@ -580,13 +881,14 @@
     }
     const b = document.createElement('div');
     b.className = 'bubble';
-    const metaHtml = `<span class="meta">${time(ts)}</span>`;
+    const tail = () => srcHtml(item.sources) + `<span class="meta">${time(ts)}${item.stopped ? ' · остановлено' : ''}</span>`;
     const fb = role === 'bot' && !item.local ? renderFeedback(item) : null;
     m.appendChild(b);
     el.body.appendChild(m);
-    if (stream) return streamInto(b, text, metaHtml, fb);
-    b.innerHTML = md(text) + metaHtml;
+    if (stream) return streamInto(b, item, tail, fb).then(refreshRegen);
+    b.innerHTML = md(text) + tail();
     if (fb) b.appendChild(fb);
+    refreshRegen();
     scrollDown();
   }
 
@@ -670,7 +972,7 @@
   function setMode(mode) {
     state.mode = mode;
     el.chat.dataset.mode = mode;
-    if (mode === 'ai') el.hint.textContent = 'ИИ-помощник';
+    if (mode === 'ai') el.hint.textContent = busy ? 'ИИ-помощник · печатает…' : 'ИИ-помощник · онлайн';
     else if (mode === 'connecting') el.hint.textContent = 'Подключаем специалиста…';
     else if (mode === 'operator') el.hint.textContent = `${state.operator.name} · специалист`;
     el.humanLink.hidden = mode !== 'ai';
@@ -681,7 +983,7 @@
    *  ЛОГИКА
    * ===================================================================== */
   function push(role, text, extra) {
-    const item = { role, text, ts: Date.now(), ...(extra || {}) };
+    const item = { id: uid(), role, text, ts: Date.now(), ...(extra || {}) };
     state.history.push(item);
     save();
     return item;
@@ -689,7 +991,7 @@
 
   async function botSay(res, { local = false } = {}) {
     const isAI = state.mode !== 'operator';
-    const item = push(isAI ? 'bot' : 'op', res.text, { chips: res.chips, cards: res.cards, ...(local ? { local: true } : {}) });
+    const item = push(isAI ? 'bot' : 'op', res.text, { chips: res.chips, cards: res.cards, sources: res.sources, ...(res.message_id ? { id: res.message_id } : {}), ...(local ? { local: true } : {}) });
     await renderMessage(item, { stream: isAI });
     emit('message', { role: item.role, text: item.text });
     renderCards(res.cards);
@@ -702,6 +1004,8 @@
     const text = raw.trim();
     if (!text) return;
     hideHero();
+    el.body.querySelectorAll('.msg.err').forEach(n => n.remove());
+    stick = true;
     renderMessage(push('user', text));
     emit('user_message', { text });
 
@@ -713,15 +1017,35 @@
     if (HUMAN_RE.test(text)) return startHandoff();
 
     state.userCount++;
+    await ask(text);
+  }
+
+  /** Один цикл «вопрос → ответ ИИ»: индикатор, запрос с таймаутом, ошибки с повтором, стриминг */
+  async function ask(text) {
+    const sid = state.sessionId;
     const stop = showTyping();
-    let res;
+    scrollDown(true);
+    const ctrl = new AbortController();
+    const g = gen = { ctrl, stopped: false, timedOut: false };
+    setBusy(true);
+    const timer = setTimeout(() => { g.timedOut = true; ctrl.abort(); }, CONFIG.ai.timeoutMs);
+    const aborted = new Promise((_, rej) => ctrl.signal.addEventListener('abort', () => rej(new Error('aborted'))));
+    aborted.catch(() => {});
+    let res, err;
     try {
-      [res] = await Promise.all([AIProvider.reply(text, state.history), wait(rand(CONFIG.ai.typingSpeed))]);
-    } catch (e) {
-      res = { text: 'Похоже, связь прервалась. Давайте я подключу специалиста.', confident: false, forceHandoff: true };
-    }
+      [res] = await Promise.race([Promise.all([AIProvider.reply(text, state.history, ctrl.signal), wait(rand(CONFIG.ai.typingSpeed))]), aborted]);
+    } catch (e) { err = e; }
+    clearTimeout(timer);
     stop();
+    if (g.stopped || sid !== state.sessionId) { if (gen === g) { gen = null; setBusy(false); } return; }
+    if (err) {
+      gen = null; setBusy(false);
+      renderError(text, g.timedOut ? 'timeout' : navigator.onLine ? 'fail' : 'offline');
+      return;
+    }
     await botSay(res);
+    if (sid !== state.sessionId) return;
+    gen = null; setBusy(false);
     if (!res.confident) state.lowConfidence++;
 
     // Предложение перейти на живую поддержку: после 3–4 вопросов, при двух «непониманиях» подряд или по теме
@@ -734,6 +1058,68 @@
       renderHandoffOffer(res.confident === false || res.forceHandoff ? 'fail' : 'count');
     }
     save();
+  }
+
+  function stopGen() { if (gen) { gen.stopped = true; gen.ctrl.abort(); } }
+
+  function setBusy(b) {
+    busy = b;
+    el.send.classList.toggle('stop', b);
+    el.send.innerHTML = b ? STOP_ICON : SEND_ICON;
+    el.send.setAttribute('aria-label', b ? 'Остановить' : 'Отправить');
+    el.send.disabled = b ? false : !el.input.value.trim();
+    if (state.mode === 'ai') el.hint.textContent = b ? 'ИИ-помощник · печатает…' : 'ИИ-помощник · онлайн';
+    refreshRegen();
+  }
+
+  /** Ошибка запроса: не теряем вопрос — «Повторить» или «Позвать человека» */
+  function renderError(text, kind) {
+    const msg = {
+      timeout: 'Ответ идёт слишком долго. Попробуйте ещё раз.',
+      offline: 'Нет соединения с интернетом. Проверьте сеть и повторите.',
+      fail: 'Не удалось получить ответ.'
+    }[kind];
+    const m = document.createElement('div');
+    m.className = 'msg err'; m.dataset.role = 'err'; m.setAttribute('role', 'alert');
+    m.innerHTML = `<div class="ava">!</div><div class="bubble">${esc(msg)}
+      <div class="err-act"><button type="button" data-a="retry">Повторить</button><button type="button" class="ghost" data-a="human">Позвать человека</button></div></div>`;
+    m.querySelector('[data-a="retry"]').onclick = () => { m.remove(); ask(text); };
+    m.querySelector('[data-a="human"]').onclick = () => { m.remove(); startHandoff(); };
+    el.body.appendChild(m);
+    scrollDown();
+    emit('error', { kind });
+  }
+
+  /** Просим оценку диалога 1–5 выборочно (CONFIG.csatRate), а не после каждого */
+  function maybeCsat(done, force) {
+    const users = state.history.filter(h => h.role === 'user').length;
+    if (!force && (state.csatDone || users < CONFIG.csatMinUserMsgs || Math.random() >= CONFIG.csatRate)) return done();
+    state.csatDone = true; save();
+    const wrap = document.createElement('div');
+    wrap.className = 'csat'; wrap.setAttribute('role', 'dialog'); wrap.setAttribute('aria-label', 'Оценка диалога');
+    wrap.innerHTML = `<h4>Как прошёл разговор?</h4><p>Оцените помощь — это поможет нам стать лучше.</p>
+      <div class="stars" role="radiogroup" aria-label="Оценка от 1 до 5">${[1, 2, 3, 4, 5].map(n =>
+        `<button type="button" role="radio" aria-checked="false" data-n="${n}" aria-label="${n} из 5">★</button>`).join('')}</div>
+      <button class="skip" type="button">Пропустить</button>`;
+    el.chat.appendChild(wrap);
+    requestAnimationFrame(() => wrap.classList.add('show'));
+    const stars = [...wrap.querySelectorAll('.stars button')];
+    const paint = n => stars.forEach((b, i) => b.classList.toggle('on', i < n));
+    const close = () => { wrap.classList.remove('show'); setTimeout(() => { wrap.remove(); done(); }, 350); };
+    stars.forEach(b => {
+      b.onmouseenter = () => paint(+b.dataset.n);
+      b.onmouseleave = () => paint(0);
+      b.onclick = () => {
+        const score = +b.dataset.n;
+        stars.forEach(x => { x.onmouseenter = x.onmouseleave = null; x.setAttribute('aria-checked', String(x === b)); });
+        paint(score);
+        wrap.querySelector('h4').textContent = 'Спасибо за оценку!';
+        if (CONFIG.ai.endpoint) postJSON(CONFIG.ai.csatEndpoint, { session_id: state.sessionId, score }).catch(() => {});
+        emit('csat', { score });
+        setTimeout(close, 900);
+      };
+    });
+    wrap.querySelector('.skip').onclick = close;
   }
 
   async function startHandoff() {
@@ -805,11 +1191,14 @@
     const last = state.history[state.history.length - 1];
     if (last?.chips) renderChips(last.chips);
     setMode(state.mode);
+    scrollDown(true);
   }
 
   function reset() {
+    stopGen(); gen = null; setBusy(false);
     try { localStorage.removeItem(CONFIG.storageKey); } catch (e) {}
-    Object.assign(state, { mode: 'ai', userCount: 0, lowConfidence: 0, nextOfferAt: CONFIG.handoffAfter, operator: null, history: [] });
+    Object.assign(state, { mode: 'ai', userCount: 0, lowConfidence: 0, nextOfferAt: CONFIG.handoffAfter, operator: null, history: [], sessionId: uid(), csatDone: false });
+    stick = true;
     el.body.innerHTML = '';
     setMode('ai');
     renderHero();
@@ -832,24 +1221,26 @@
     if (!d || d.source !== 'spraystore-host') return;
     if (d.type === 'send' && d.text) submit(String(d.text));
     else if (d.type === 'reset') reset();
+    else if (d.type === 'csat') maybeCsat(() => {}, true);
     else if (d.type === 'handoff') startHandoff();
     else if (d.type === 'focus') el.input.focus();
   });
 
   /* ---------- Events ---------- */
-  $('ssReset').onclick = reset;
+  $('ssReset').onclick = () => maybeCsat(reset);
   el.humanLink.onclick = () => { hideHero(); renderMessage(push('user', 'Позовите специалиста')); startHandoff(); };
 
   el.input.addEventListener('input', () => {
-    el.send.disabled = !el.input.value.trim();
+    el.send.disabled = busy ? false : !el.input.value.trim();
     el.input.style.height = 'auto';
     el.input.style.height = Math.min(el.input.scrollHeight, 120) + 'px';
   });
   el.input.addEventListener('keydown', e => {
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); el.form.requestSubmit(); }
+    if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); if (!busy) el.form.requestSubmit(); }
   });
   el.form.addEventListener('submit', e => {
     e.preventDefault();
+    if (busy) return stopGen();   // в режиме генерации кнопка работает как «Остановить»
     const v = el.input.value;
     el.input.value = ''; el.input.style.height = 'auto'; el.send.disabled = true;
     submit(v);

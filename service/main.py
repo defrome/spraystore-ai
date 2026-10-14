@@ -239,6 +239,9 @@ def retrieve(question: str, k: int = 4) -> list[dict]:
         hits.append({"text": text, "topic": meta["topic"], "score": 1 - dist})
     return hits
 
+MODEL = "deepseek-v4-1-flash"
+PROMPT_VERSION = "v1"   # менять при правках SYSTEM_PROMPT — попадает в лог для разбора дизлайков
+
 SYSTEM_PROMPT = """Ты — умный ассистент интернет-магазина SprayStore (spraystore.ru).
 Отвечай вежливо, кратко, по делу, на русском языке.
 Используй ТОЛЬКО информацию из блока «Контекст» ниже.
@@ -264,7 +267,7 @@ def answer(question: str, history: list | None = None, k: int = 4, debug: bool =
     messages.append({"role": "user", "content": question})
 
     r = llm.chat.completions.create(
-        model="deepseek-v4-1-flash",
+        model=MODEL,
         messages=messages,
         temperature=0.3,
     )
