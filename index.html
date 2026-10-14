@@ -224,8 +224,9 @@
     scroll-snap-align: start; transition: transform .25s var(--ease), border-color .2s; cursor: pointer; text-decoration: none; color: inherit;
   }
   .pcard:hover { transform: translateY(-3px); border-color: var(--ink); }
-  .pcard .img { height: 76px; border-radius: 10px; background: linear-gradient(135deg, #fff8d6, #f3efe3); display: grid; place-items: center; font-size: 30px; margin-bottom: 10px; }
-  .pcard .n { font-size: 12.5px; font-weight: 700; line-height: 1.3; min-height: 32px; }
+  .pcard .img { height: 112px; border-radius: 10px; background: linear-gradient(135deg, #fff8d6, #f3efe3); display: grid; place-items: center; font-size: 30px; margin-bottom: 10px; overflow: hidden; }
+  .pcard .img img { width: 100%; height: 100%; object-fit: contain; mix-blend-mode: multiply; }
+  .pcard .n { font-size: 12.5px; font-weight: 700; line-height: 1.3; height: 48px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
   .pcard .p { margin-top: 6px; display: flex; justify-content: space-between; align-items: center; font-size: 13px; font-weight: 800; }
   .pcard .p span { width: 24px; height: 24px; border-radius: 7px; background: var(--yellow); display: grid; place-items: center; font-size: 12px; }
 
@@ -616,14 +617,15 @@
       .replace(/`([^`\n]+)`/g, '<code>$1</code>')
       .replace(/\*\*(.+?)\*\*/g, '<b>$1</b>')
       .replace(/\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>')
-      .replace(/(^|[\s(])(https?:\/\/[^\s<)]+)/g, '$1<a href="$2" target="_blank" rel="noopener noreferrer">$2</a>');
+      .replace(/(^|[\s(])(https?:\/\/[^\s<)]+)/g, (_, pre, url) =>
+        `${pre}<a href="${url}" target="_blank" rel="noopener noreferrer">${url.length > 40 ? 'Открыть на сайте ↗' : url}</a>`);
     const out = []; let list = null;
     const closeList = () => { if (list) { out.push(`</${list}>`); list = null; } };
-    const openList = tag => { if (list !== tag) { closeList(); out.push(`<${tag}>`); list = tag; } };
+    const openList = (tag, start) => { if (list !== tag) { closeList(); out.push(tag === 'ol' && start > 1 ? `<ol start="${start}">` : `<${tag}>`); list = tag; } };
     for (const line of t.split('\n')) {
       let m;
       if ((m = line.match(/^\s*[-*•—–]\s+(.*)$/))) { openList('ul'); out.push(`<li>${m[1]}</li>`); }
-      else if ((m = line.match(/^\s*\d+[.)]\s+(.*)$/))) { openList('ol'); out.push(`<li>${m[1]}</li>`); }
+      else if ((m = line.match(/^\s*(\d+)[.)]\s+(.*)$/))) { openList('ol', +m[1]); out.push(`<li>${m[2]}</li>`); }
       else {
         closeList();
         const c = line.match(/^\u0000(\d+)\u0000$/);
@@ -923,7 +925,7 @@
         a.href = href || CONFIG.links.catalog;
         if (href) { a.target = '_blank'; a.rel = 'noopener noreferrer'; }
         const price = typeof it.price === 'number' ? Math.round(it.price).toLocaleString('ru-RU') + ' ₽' : 'цена по запросу';
-        a.innerHTML = `<div class="img">${img ? `<img src="${esc(img)}" alt="" style="max-width:100%;max-height:100%;object-fit:contain;border-radius:10px">` : '🔫'}</div>` +
+        a.innerHTML = `<div class="img">${img ? `<img src="${esc(img)}" alt="" loading="lazy">` : '🔫'}</div>` +
           `<div class="n">${esc(String(it.name))}</div><div class="p">${esc(price)}<span>→</span></div>`;
         const im = a.querySelector('img');
         if (im) im.onerror = () => { im.parentNode.textContent = '🔫'; };

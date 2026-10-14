@@ -10,7 +10,9 @@ import pytest
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.dirname(HERE))          # service/ — плоские импорты, как в api.py
-os.environ.pop("KIT_API_TOKEN", None)              # реальный токен тестам не нужен и не должен утечь
+# Пустое значение (а не удаление): load_dotenv не перезаписывает уже заданные переменные,
+# иначе тесты подхватили бы реальный токен из service/.env и ходили бы в настоящий KIT.
+os.environ["KIT_API_TOKEN"] = ""
 
 
 class StubEmbedder:
