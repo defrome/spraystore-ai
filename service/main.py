@@ -4,9 +4,15 @@ import chromadb
 from openai import OpenAI
 from sentence_transformers import SentenceTransformer
 
+try:
+    from dotenv import load_dotenv
+    load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
+except ImportError:
+    pass
+
 llm = OpenAI(
-    api_key="sk-xrciVHuBHtfM7K2ro5ItkOaMIpO6mBYxx9wGZcdhMTkkJhRAZ1kvk4DVvjwX",
-    base_url="https://proxy.gen-api.ru/v1",
+    api_key=os.environ["GENAPI_KEY"],
+    base_url=os.getenv("GENAPI_BASE_URL", "https://proxy.gen-api.ru/v1"),
 )
 
 embedder = SentenceTransformer("intfloat/multilingual-e5-small")
