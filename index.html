@@ -229,6 +229,13 @@
   .pcard .n { font-size: 12.5px; font-weight: 700; line-height: 1.3; height: 48px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
   .pcard .p { margin-top: 6px; display: flex; justify-content: space-between; align-items: center; font-size: 13px; font-weight: 800; }
   .pcard .p span { width: 24px; height: 24px; border-radius: 7px; background: var(--yellow); display: grid; place-items: center; font-size: 12px; }
+  /* Низкое окно (чат в iframe): вертикальная карточка ~330px не влезает в ленту — делаем горизонтальную, фото слева */
+  @media (max-height: 640px) {
+    .pcard { width: 256px; display: grid; grid-template-columns: 64px 1fr; grid-template-rows: 1fr auto; column-gap: 10px; padding: 10px; }
+    .pcard .img { grid-row: 1 / 3; margin: 0; }
+    .pcard .n { height: auto; max-height: 48px; }
+    .pcard .p { margin-top: 4px; align-self: end; }
+  }
 
   /* Handoff card */
   .handoff {
