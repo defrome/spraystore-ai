@@ -25,10 +25,33 @@ _PRODUCT_RE = re.compile(
     r"\d\s*(₽|руб|р\b|тыс|к\b)", re.I)
 
 
+# «а скинь карточку», «дай ссылку», «покажи его» — просят показать товар, о котором шла речь раньше
+_CARD_REQ_RE = re.compile(r"карточк|ссылк|скин(ь|ьте)|пришли|покажи|где купить|на сайте|фото(графи)?", re.I)
+_QUOTED_RE = re.compile(r"«([^»\n]{6,160})»")
+
+
+def is_card_request(question: str) -> bool:
+    return len(question) < 60 and bool(_CARD_REQ_RE.search(question))
+
+
+def previous_product_names(history: list | None, limit: int = 3) -> list[str]:
+    """Названия товаров «в кавычках» из последних ответов бота (новые первыми, без повторов)."""
+    names: list[str] = []
+    for h in reversed(history or []):
+        if h.get("role") != "assistant":
+            continue
+        for n in reversed(_QUOTED_RE.findall(h["content"])):
+            if n not in names:
+                names.append(n)
+    return names[:limit]
+
+
 def is_product_query(question: str, history: list | None = None) -> bool:
     """Нужен ли поиск по каталогу. Короткие уточнения («а подешевле?») наследуют тему из прошлой реплики."""
     if _PRODUCT_RE.search(question):
         return True
+    if is_card_request(question):
+        return bool(history)
     if history and len(question) < 40:
         prev = [h["content"] for h in history if h.get("role") == "user"]
         return bool(prev) and bool(_PRODUCT_RE.search(prev[-1]))
@@ -69,6 +92,17 @@ def prepare_products(question: str, history: list | None = None, k: int = 5) -> 
     """Ветка «context»: сами решаем, что запрос товарный, и сами ищем."""
     if not is_product_query(question, history):
         return []
+    if is_card_request(question):
+        found: dict[str, Product] = {}
+        for name in previous_product_names(history):
+            for p in catalog.search_products(name, k=1):
+                found.setdefault(p.id, p)
+        if not found:   # названия в кавычках не нашлись — ищем по тексту последних ответов бота
+            texts = [h["content"] for h in (history or []) if h.get("role") == "assistant"]
+            for p in catalog.search_products(" ".join(texts[-2:])[:400], k=3) if texts else []:
+                found.setdefault(p.id, p)
+        if found:
+            return list(found.values())
     max_price = extract_max_price(question)
     if max_price is None and history:   # «а до 10 000?» могло прозвучать раньше
         for h in reversed([x for x in history if x.get("role") == "user"][-2:]):

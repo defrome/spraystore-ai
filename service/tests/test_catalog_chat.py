@@ -61,6 +61,20 @@ def test_mentioned_products():
     assert cc.mentioned_products("Подходящих товаров нет", ps) == []
 
 
+def test_card_request_uses_previous_product(monkeypatch):
+    hist = [{"role": "user", "content": "нужен безвоздушный аппарат"},
+            {"role": "assistant", "content": "Рекомендую «Безвоздушный аппарат TEC18» — 22 990 ₽"},
+            {"role": "user", "content": "а есть ещё?"},
+            {"role": "assistant", "content": "Хорошо, продолжаем!"}]
+    assert cc.is_card_request("а скинь карточку") and not cc.is_card_request("как красить забор")
+    assert cc.previous_product_names(hist) == ["Безвоздушный аппарат TEC18"]
+    assert cc.is_product_query("а скинь карточку", hist) and not cc.is_product_query("а скинь карточку", [])
+    seen = []
+    monkeypatch.setattr(cc.catalog, "search_products", lambda q, **kw: (seen.append(q), [P(id="9", name=q)])[1])
+    assert [p.id for p in cc.prepare_products("а скинь карточку", hist)] == ["9"]
+    assert seen == ["Безвоздушный аппарат TEC18"]
+
+
 def test_append_links():
     a = P(id="1", name="Один", url="https://x.ru/a")
     b = P(id="2", name="Два", url="https://x.ru/b")
