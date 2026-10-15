@@ -1,7 +1,10 @@
 # TLS-терминация. По умолчанию — сертификат Let's Encrypt для домена sslip.io, который указывает на IP стейджинга.
 # Запасной вариант (самоподписанный, браузер предупредит): SITE_ADDRESS=158.160.204.91 TLS_MODE=internal
+{
+	{$LOCAL_CERTS:}
+}
+
 {$SITE_ADDRESS:158-160-204-91.sslip.io} {
-	tls {$TLS_MODE:}
 	encode zstd gzip
 	reverse_proxy nginx:80
 }
