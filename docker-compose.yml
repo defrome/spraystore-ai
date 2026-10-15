@@ -5,7 +5,7 @@ services:
     env_file: service/.env
     environment:
       # на стейджинге чат встраивается с этого же адреса; для другого домена-хоста добавьте его через запятую
-      CORS_ORIGINS: ${CORS_ORIGINS:-http://158.160.204.91}
+      CORS_ORIGINS: ${CORS_ORIGINS:-https://158-160-204-91.sslip.io,https://158.160.204.91}
     volumes:
       - data:/data
     expose:
@@ -21,10 +21,25 @@ services:
     image: nginx:1.27-alpine
     restart: unless-stopped
     depends_on: [app]
-    ports:
-      - "80:80"
+    expose:
+      - "80"
     volumes:
       - ./deploy/nginx.conf:/etc/nginx/conf.d/default.conf:ro
 
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on: [nginx]
+    ports:
+      - "80:80"     # нужен для выпуска сертификата и редиректа на https
+      - "443:443"
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS:-158-160-204-91.sslip.io}
+      TLS_MODE: ${TLS_MODE:-}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+
 volumes:
   data:
+  caddy_data:

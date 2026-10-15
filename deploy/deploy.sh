@@ -9,11 +9,12 @@ for k in GENAPI_KEY ADMIN_TOKEN; do
 done
 
 docker compose up -d --build
+HOST="${SITE_ADDRESS:-158-160-204-91.sslip.io}"
 echo "Жду готовности (первый старт ~1-2 минуты: строится индекс)..."
 for _ in $(seq 1 60); do
-  if curl -fsS http://127.0.0.1/api/health >/dev/null 2>&1; then
-    curl -sS http://127.0.0.1/api/health; echo; echo "OK: http://158.160.204.91/  админка: /admin"; exit 0
+  if curl -fsSk --resolve "$HOST:443:127.0.0.1" "https://$HOST/api/health" 2>/dev/null; then
+    echo; echo "OK: https://$HOST/   админка: https://$HOST/admin"; exit 0
   fi
   sleep 5
 done
-echo "Сервис не поднялся, логи: docker compose logs app" >&2; exit 1
+echo "Сервис не поднялся, логи: docker compose logs app caddy" >&2; exit 1
