@@ -58,14 +58,10 @@
     display: inline-flex; align-items: center; justify-content: center; transition: background .15s;
   }
   .ss-head .ib:hover { background: var(--sand); }
-  .ss-head .ib[hidden] { display: none; }
   .ss-head #ssReset:hover svg { transform: rotate(-90deg); }
   .ss-head #ssReset svg { transition: transform .4s var(--ease); }
-  /* на приветственном экране шапка пустая: только «закрыть» (если чат во фрейме) */
-  .ss-chat:has(#ssHero:not(.gone)) .ss-head { border-bottom-color: transparent; }
-  .ss-chat:has(#ssHero:not(.gone)) .ss-head:has(#ssClose[hidden]) { display: none; }   /* не во фрейме и нечего показывать */
-  .ss-chat:has(#ssHero:not(.gone)) .ss-head { padding-top: 4px; padding-bottom: 0; }
-  .ss-chat:has(#ssHero:not(.gone)) .ss-head :is(.logo, .who, #ssReset) { visibility: hidden; }
+  /* на приветственном экране шапка не нужна: логотип и заголовок уже в центре */
+  .ss-chat:has(#ssHero:not(.gone)) .ss-head { display: none; }
 
   /* ---------- Приветственный экран ---------- */
   .ss-hero {
@@ -397,7 +393,6 @@
         <div class="ss-status"><i class="dot"></i><span id="ssHintText">ИИ-помощник · онлайн</span></div>
       </div>
       <button type="button" class="ib" id="ssReset" title="Новый диалог" aria-label="Новый диалог"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg></button>
-      <button type="button" class="ib" id="ssClose" aria-label="Свернуть чат" hidden><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
     </header>
     <div class="ss-mode-bar"></div>
 
@@ -1267,7 +1262,6 @@
   /* ---------- Events ---------- */
   $('ssReset').onclick = () => maybeCsat(reset);
   $('ssLogo').src = CONFIG.logo;
-  if (embedded) { const c = $('ssClose'); c.hidden = false; c.onclick = () => emit('close'); }   // «свернуть» — хост-страница закрывает окно
   el.humanLink.onclick = () => { hideHero(); renderMessage(push('user', 'Позовите специалиста')); startHandoff(); };
 
   el.input.addEventListener('input', () => {
