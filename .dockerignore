@@ -1,0 +1,9 @@
+.git
+.idea
+.claude
+**/__pycache__
+**/.env
+.env
+service/chroma_spraystore
+service/chat_log.db
+service/tests

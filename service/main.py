@@ -238,7 +238,7 @@ def build_chunks() -> list[dict]:
             })
     return result
 
-DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "chroma_spraystore")
+DB_PATH = os.getenv("CHROMA_PATH", os.path.join(os.path.dirname(os.path.abspath(__file__)), "chroma_spraystore"))
 COLLECTION = "spraystore"
 
 def get_collection():
