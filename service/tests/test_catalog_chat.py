@@ -61,6 +61,17 @@ def test_mentioned_products():
     assert cc.mentioned_products("Подходящих товаров нет", ps) == []
 
 
+def test_append_links():
+    a = P(id="1", name="Один", url="https://x.ru/a")
+    b = P(id="2", name="Два", url="https://x.ru/b")
+    assert cc.append_links("Ответ.", [a]) == "Ответ.\n\nСсылка: [Открыть на сайте ↗](https://x.ru/a)"
+    two = cc.append_links("Ответ.", [a, b])
+    assert two.startswith("Ответ.\n\nСсылки:\n- Один: [") and "- Два: [Открыть на сайте ↗](https://x.ru/b)" in two
+    assert cc.append_links("Ответ.", []) == "Ответ."
+    assert cc.append_links("Ответ.", [P(id="3", name="Без", url="")]) == "Ответ."          # нет URL — нечего добавлять
+    assert cc.append_links("Смотрите https://x.ru/a", [a]) == "Смотрите https://x.ru/a"   # модель уже дала ссылку
+
+
 # ---------- tool calling (мок OpenAI)
 
 def tool_call(name, args, cid="c1"):

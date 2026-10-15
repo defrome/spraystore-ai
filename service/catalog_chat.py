@@ -106,6 +106,21 @@ def format_products_block(products: list[Product], searched: bool = True) -> str
     return "=== Товары из каталога ===\n" + "\n".join(format_product(i, p) for i, p in enumerate(products, 1))
 
 
+LINK_LABEL = "Открыть на сайте ↗"
+
+
+def append_links(text: str, products: list[Product]) -> str:
+    """Под ответом, где названы товары каталога, всегда стоит ссылка на сайт (модель URL в текст не вставляет — см. промпт).
+    Один товар: «Ссылка: …», несколько: список «название — ссылка»."""
+    items = [p for p in products if p.url and p.url not in text]
+    if not items:
+        return text
+    if len(items) == 1:
+        return f"{text.rstrip()}\n\nСсылка: [{LINK_LABEL}]({items[0].url})"
+    lines = "\n".join(f"- {p.name}: [{LINK_LABEL}]({p.url})" for p in items)
+    return f"{text.rstrip()}\n\nСсылки:\n{lines}"
+
+
 def mentioned_products(text: str, products: list[Product], limit: int = MAX_CARDS) -> list[Product]:
     """Какие из товаров контекста модель реально назвала в ответе (по названию или артикулу) — их и показываем карточками."""
     norm = lambda s: re.sub(r"[\s ]+", " ", s).casefold()

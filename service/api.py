@@ -134,6 +134,7 @@ def chat(req: ChatRequest):
     products = catalog_chat.mentioned_products(res["text"], res.get("products") or [])
     # уверенность: статьи нашлись ИЛИ ответ опирается на товары каталога
     confident = NO_INFO_MARK not in res["text"].lower() and (top >= MIN_SCORE or bool(products))
+    text = catalog_chat.append_links(res["text"], products)   # ссылка «Открыть на сайте» — всегда, когда ответ из каталога
     sources = []
     if confident:
         for h in hits:
@@ -147,14 +148,14 @@ def chat(req: ChatRequest):
             con.execute(
                 "INSERT INTO messages (id, session_id, ts, question, answer, model, prompt_version, sources,"
                 " top_score, confident, latency_ms, products) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
-                (message_id, req.session_id, started, req.message, res["text"], rag.MODEL, rag.PROMPT_VERSION,
+                (message_id, req.session_id, started, req.message, text, rag.MODEL, rag.PROMPT_VERSION,
                  json.dumps([h["topic"] for h in hits], ensure_ascii=False), top, int(confident),
                  int((time.time() - started) * 1000),
                  json.dumps([p.id for p in products]) if products else None),
             )
     except Exception as e:   # лог не должен ронять ответ
         print(f"[log] не записали сообщение: {e!r}")
-    out = {"text": res["text"], "confident": confident, "message_id": message_id, "sources": sources}
+    out = {"text": text, "confident": confident, "message_id": message_id, "sources": sources}
     if products:   # поле cards — только когда есть товары; формат {id, name, price, url, image?, in_stock}
         out["cards"] = [p.to_card() for p in products]
     return out

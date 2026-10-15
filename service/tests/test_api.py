@@ -33,6 +33,7 @@ def test_chat_cards_and_log(api, monkeypatch):
     assert j["cards"] == [{"id": "v1", "name": "Wagner FLEXiO 590", "price": 9990.0, "url": "https://x.ru/p",
                            "in_stock": True, "image": "https://x.ru/i.jpg"}]
     assert j["confident"] is True       # статей нет, но ответ опирается на товар
+    assert j["text"].endswith("Ссылка: [Открыть на сайте ↗](https://x.ru/p)")   # ссылка добавляется всегда
     with sqlite3.connect(api.LOG_DB) as con:
         assert con.execute("SELECT products FROM messages WHERE id=?", (j["message_id"],)).fetchone()[0] == '["v1"]'
 
