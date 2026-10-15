@@ -838,28 +838,42 @@
       return /^https?:\/\//.test(x.url || '') ? `<a href="${esc(x.url)}" target="_blank" rel="noopener noreferrer">${title}</a>` : `<span class="s">${title}</span>`;
     }).join('')}</div>`;
 
-  /** Плавная «печать» ответа: слово за словом; кнопка «Остановить» обрывает её на текущем месте */
+  /** Плавная «печать» ответа: посимвольно, по кадрам анимации, с постоянной скоростью (~110 зн/с, весь ответ — не дольше ~6 с).
+   *  Кнопка «Остановить» обрывает печать на текущем месте. Ссылки и `код` появляются целиком, а не кусками разметки. */
   async function streamInto(bubble, item, tail, fb) {
     const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
-    const parts = item.text.match(/\s+|\S+/g) || [];
-    const tick = 32, maxMs = 3500;
-    const step = Math.max(1, Math.ceil(parts.length / (maxMs / tick)));
+    const text = item.text, total = text.length;
+    const spans = [];   // участки, которые нельзя показывать наполовину
+    for (const m of text.matchAll(/\[[^\]\n]+\]\([^)\s]+\)|```[\s\S]*?```|`[^`\n]+`/g)) spans.push([m.index, m.index + m[0].length]);
+    const cps = Math.max(110, total / 6);
     const g = gen;
-    let shown = parts.length;
+    let shown = total;
     bubble.classList.add('streaming');
     bubble.setAttribute('aria-busy', 'true');
-    for (let i = 0; i < parts.length && !reduce; i += step) {
-      if (g?.stopped || !bubble.isConnected) { shown = i; break; }
-      let part = parts.slice(0, i + step).join('');
-      if ((part.match(/\*\*/g) || []).length % 2) part += '**';   // не мигать незакрытым **
-      bubble.innerHTML = md(part);
-      scrollDown();
-      await wait(tick + Math.random() * 18);
+    if (!reduce) {
+      const t0 = performance.now();
+      let idx = 0;
+      shown = 0;
+      while (idx < total) {
+        if (g?.stopped || !bubble.isConnected) break;
+        let n = Math.min(total, Math.floor((performance.now() - t0) / 1000 * cps));
+        const sp = spans.find(([a, b]) => n > a && n < b);
+        if (sp) n = sp[1];
+        if (n > idx) {
+          idx = n; shown = n;
+          let part = text.slice(0, n);
+          if ((part.match(/\*\*/g) || []).length % 2) part += '**';   // не мигать незакрытым **
+          bubble.innerHTML = md(part);
+          scrollDown();
+        }
+        await new Promise(requestAnimationFrame);
+      }
+      if (shown >= total) shown = total;
     }
-    if (shown < parts.length) {
-      item.text = parts.slice(0, shown).join('').trimEnd();
+    if (shown < total) {
+      item.text = text.slice(0, shown).trimEnd();
       item.stopped = true;
-      if (!item.text) {   // остановили до первого слова — ответа как бы не было
+      if (!item.text) {   // остановили до первого символа — ответа как бы не было
         bubble.closest('.msg')?.remove();
         const i = state.history.indexOf(item);
         if (i >= 0) state.history.splice(i, 1);
