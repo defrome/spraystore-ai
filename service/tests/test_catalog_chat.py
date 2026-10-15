@@ -215,4 +215,4 @@ def test_without_token_behaves_as_before(wired, monkeypatch):
     res = rag.answer("Посоветуйте краскопульт для лака", [])
     assert searched == [] and res == {"text": "Ответ", "hits": res["hits"], "products": []}
     assert "tools" not in rag.llm.calls[0] and "=== Товары из каталога ===" not in rag.llm.calls[0]["messages"][0]["content"]
-    assert rag.PROMPT_VERSION == "v3"
+    assert rag.PROMPT_VERSION == "v4"
