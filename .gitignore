@@ -7,3 +7,6 @@ service/chat_log.db
 # локальный список PDF с Яндекс Диска (scripts/yd_pdf_list.py)
 yd_pdfs.csv
 .~lock.*#
+
+# PDF и обложки для GitHub Pages: пока только локально (выложить: git add -f docs)
+docs/
