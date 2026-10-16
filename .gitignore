@@ -10,4 +10,3 @@ yd_pdfs.csv
 
 # PDF и обложки для GitHub Pages: пока только локально (выложить: git add -f docs)
 docs/
-yd_covers/

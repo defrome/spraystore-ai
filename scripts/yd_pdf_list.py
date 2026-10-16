@@ -5,10 +5,12 @@
   1. Обходит публичную папку Диска (TECMASTER, WAGNER и любые подпапки).
   2. Для каждого PDF берёт ссылку на файл внутри папки Диска:
      https://disk.yandex.ru/d/<ключ>/<папка>/<файл>.pdf
-  3. Сохраняет обложку каждого PDF (первая страница) в yd_covers/<папка>/<файл>.jpg в корне проекта.
+  3. Сохраняет обложку каждого PDF (первая страница) в covers/<папка>/<файл>.jpg в корне проекта
+     (имена латиницей, без пробелов — чтобы ссылки не ломались).
      Берёт превью Диска; если Диск не отдал (500) — качает PDF и рисует страницу через pdftoppm.
   4. Печатает список (по папкам) и пишет yd_pdfs.csv в корне: папка, название, ссылка на PDF,
-     файл обложки.
+     ссылка на обложку. Обложки раздаёт GitHub Pages после пуша папки covers/:
+     https://defrome.github.io/spraystore-ai/covers/<папка>/<файл>.jpg (адрес меняется через PAGES_BASE).
 
 Запуск:
   python3 scripts/yd_pdf_list.py                       # ссылка по умолчанию
@@ -16,7 +18,8 @@
   python3 scripts/yd_pdf_list.py --direct              # + прямая ссылка на скачивание (временная, ~30 мин)
   python3 scripts/yd_pdf_list.py --force               # перекачать обложки заново
 
-yd_pdfs.csv и yd_covers/ лежат только локально (они в .gitignore). Только стандартная библиотека.
+Дальше: git add covers && git commit -m "Обложки" && git push. yd_pdfs.csv лежит только локально (.gitignore).
+Только стандартная библиотека.
 """
 import argparse
 import concurrent.futures
@@ -34,7 +37,18 @@ import urllib.request
 API = "https://cloud-api.yandex.net/v1/disk/public/resources"
 DEFAULT_KEY = "https://disk.yandex.ru/d/xxunmuNTZX-2Dg"
 ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
-COVERS = os.path.join(ROOT, "yd_covers")
+COVERS = os.path.join(ROOT, "covers")
+PAGES_BASE = os.environ.get("PAGES_BASE", "https://defrome.github.io/spraystore-ai").rstrip("/")
+TRANSLIT = dict(zip(
+    "абвгдеёжзийклмнопрстуфхцчшщъыьэюя",
+    ["a", "b", "v", "g", "d", "e", "e", "zh", "z", "i", "y", "k", "l", "m", "n", "o", "p",
+     "r", "s", "t", "u", "f", "h", "ts", "ch", "sh", "sch", "", "y", "", "e", "yu", "ya"]))
+
+
+def safe_name(text: str) -> str:
+    """Кириллица -> латиница, пробелы -> «_»; регистр и остальные символы сохраняем (имена не слипаются)."""
+    out = "".join(TRANSLIT.get(ch.lower(), ch) if ch.lower() in TRANSLIT else ch for ch in text)
+    return "".join(c if c.isascii() and (c.isalnum() or c in "-_.") else "_" for c in out)
 DEFAULT_CSV = os.path.join(ROOT, "yd_pdfs.csv")
 PAGE = 100
 
@@ -123,7 +137,7 @@ def main() -> None:
         parts = it["path"].strip("/").split("/")
         folder = parts[-2] if len(parts) > 1 else "(корень)"  # ближайшая папка: TECMASTER / WAGNER
         stem = os.path.splitext(it["name"])[0]
-        rel = os.path.join("yd_covers", folder, stem + ".jpg")
+        rel = os.path.join("covers", folder, safe_name(stem) + ".jpg")
         dest = os.path.join(ROOT, rel)
         ok = os.path.exists(dest) and not args.force
         ok = ok or (bool(it.get("preview")) and save_preview(it["preview"], dest))
@@ -136,7 +150,8 @@ def main() -> None:
             except Exception as exc:
                 print(f"  прямая ссылка не получена ({it['name']}): {exc}", file=sys.stderr)
         link = base + urllib.parse.quote(it["path"])
-        return [folder, it["name"], link, rel if ok else ""] + ([direct] if args.direct else [])
+        cover_url = f"{PAGES_BASE}/" + "/".join(rel.split(os.sep)) if ok else ""
+        return [folder, it["name"], link, cover_url] + ([direct] if args.direct else [])
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=args.jobs) as pool:
         rows = list(pool.map(process, items))
@@ -152,7 +167,7 @@ def main() -> None:
     out = os.path.abspath(args.csv)
     with open(out, "w", newline="", encoding="utf-8-sig") as f:
         w = csv.writer(f)
-        w.writerow(["Папка", "Название", "Ссылка на PDF", "Файл обложки"] + (["Прямая ссылка (временная)"] if args.direct else []))
+        w.writerow(["Папка", "Название", "Ссылка на PDF", "Ссылка на обложку"] + (["Прямая ссылка (временная)"] if args.direct else []))
         w.writerows(rows)
 
     missing = [r[1] for r in rows if not r[3]]
