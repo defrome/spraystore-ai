@@ -92,25 +92,38 @@ def pretty_title(filename: str):
     return base, model
 
 
+def _fetch(link: str, tmp: str, dest: str):
+    req = urllib.request.Request(link, headers={"User-Agent": "Mozilla/5.0 (sprayguides-sync)"})
+    with urllib.request.urlopen(req, timeout=180) as resp, open(tmp, "wb") as out:
+        shutil.copyfileobj(resp, out)
+    if os.path.getsize(tmp) < 100:
+        raise RuntimeError("пустой ответ")
+    os.replace(tmp, dest)
+
+
 def download(item: dict, dest: str):
-    """Скачивает файл; Диск иногда отвечает 500 — берём новую ссылку и повторяем."""
+    """Скачивает файл. Диск иногда отвечает 500/504, поэтому пробуем два канала:
+    прямую ссылку из листинга (item['file']) и ссылку из /download, по очереди."""
     tmp = dest + ".part"
     last = None
-    for attempt in range(5):
-        try:
-            link = api_get({"public_key": PUBLIC_KEY, "path": item["path"]}, "/download")["href"]
-            req = urllib.request.Request(link, headers={"User-Agent": "Mozilla/5.0 (sprayguides-sync)"})
-            with urllib.request.urlopen(req, timeout=300) as resp, open(tmp, "wb") as out:
-                shutil.copyfileobj(resp, out)
-            os.replace(tmp, dest)
-            return True
-        except Exception as exc:
-            last = exc
-            print(f"  повтор {attempt + 1}/5 для {item['path']}: {exc}", file=sys.stderr)
-            time.sleep(5 * (attempt + 1))
+    for attempt in range(3):
+        for name in ("listing", "download"):
+            try:
+                if name == "listing":
+                    link = item.get("file")
+                    if not link:
+                        continue
+                else:
+                    link = api_get({"public_key": PUBLIC_KEY, "path": item["path"]}, "/download")["href"]
+                _fetch(link, tmp, dest)
+                return True
+            except Exception as exc:
+                last = exc
+                print(f"  {name}: попытка {attempt + 1}/3 для {item['path']}: {exc}", file=sys.stderr)
+        time.sleep(4 * (attempt + 1))
     if os.path.exists(tmp):
         os.remove(tmp)
-    print(f"  ПРОПУЩЕН {item['path']}: {last}", file=sys.stderr)
+    print(f"  ПРОПУЩЕН {item['path']} ({item.get('size', 0) // 1024} КБ): {last}", file=sys.stderr)
     return False
 
 
