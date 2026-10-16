@@ -11,6 +11,7 @@
 
 Запуск: YD_PUBLIC_KEY=<публичная ссылка на папку> python3 scripts/sync_sprayguides.py
 """
+import html
 import json
 import os
 import re
@@ -185,6 +186,49 @@ def make_cover(pdf: str, jpg: str):
     )
 
 
+PAGES_BASE = "https://defrome.github.io/spraystore-ai/sprayguides/"
+
+
+def build_kit_section(groups: list):
+    """Готовая HTML-секция для KIT (стиль ss-docs): карточки всех PDF, без настроек и без лимита."""
+    esc = lambda t: html.escape(str(t), quote=True)
+    cards = []
+    for g in groups:
+        for it in g["items"]:
+            name = f"{it['title']} {it['model']}".strip()
+            img = (f'<img class="ss-docs__img" src="{PAGES_BASE}{esc(it["cover"])}" alt="" loading="lazy">'
+                   if it.get("cover") else "")
+            cards.append(f"""      <a class="ss-docs__card" href="{PAGES_BASE}{esc(it['file'])}" target="_blank" rel="noopener">
+        <span class="ss-docs__photo">{img}</span>
+        <span class="ss-docs__label">
+          <span class="ss-docs__name">{esc(name)}</span>
+          <span class="ss-docs__meta">
+            <span>{esc(g['name'])}</span>
+            <span class="ss-docs__arrow">↗</span>
+          </span>
+        </span>
+      </a>""")
+    page = """<section class="ss-docs">
+  <div class="ss-docs__inner">
+
+    <div class="ss-docs__head">
+      <h2 class="ss-docs__title">Инструкции к оборудованию</h2>
+      <p class="ss-docs__text">Руководства по эксплуатации в PDF. Откройте нужную инструкцию или скачайте её.</p>
+    </div>
+
+    <div class="ss-docs__grid">
+
+""" + "\n\n".join(cards) + """
+
+    </div>
+
+  </div>
+</section>
+"""
+    with open(os.path.join(ROOT, "kit-section.html"), "w", encoding="utf-8") as f:
+        f.write(page)
+
+
 def main():
     if not PUBLIC_KEY:
         sys.exit("Нужна переменная окружения YD_PUBLIC_KEY (публичная ссылка на папку)")
@@ -253,6 +297,7 @@ def main():
     }
     with open(DATA, "w", encoding="utf-8") as f:
         json.dump(out, f, ensure_ascii=False, indent=1)
+    build_kit_section(out["groups"])
     print(f"Готово: {sum(len(g['items']) for g in out['groups'])} файлов в {len(out['groups'])} папках")
 
 
