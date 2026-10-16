@@ -93,11 +93,25 @@ def pretty_title(filename: str):
 
 
 def download(item: dict, dest: str):
-    link = api_get({"public_key": PUBLIC_KEY, "path": item["path"]}, "/download")["href"]
+    """Скачивает файл; Диск иногда отвечает 500 — берём новую ссылку и повторяем."""
     tmp = dest + ".part"
-    with urllib.request.urlopen(link, timeout=300) as resp, open(tmp, "wb") as out:
-        shutil.copyfileobj(resp, out)
-    os.replace(tmp, dest)
+    last = None
+    for attempt in range(5):
+        try:
+            link = api_get({"public_key": PUBLIC_KEY, "path": item["path"]}, "/download")["href"]
+            req = urllib.request.Request(link, headers={"User-Agent": "Mozilla/5.0 (sprayguides-sync)"})
+            with urllib.request.urlopen(req, timeout=300) as resp, open(tmp, "wb") as out:
+                shutil.copyfileobj(resp, out)
+            os.replace(tmp, dest)
+            return True
+        except Exception as exc:
+            last = exc
+            print(f"  повтор {attempt + 1}/5 для {item['path']}: {exc}", file=sys.stderr)
+            time.sleep(5 * (attempt + 1))
+    if os.path.exists(tmp):
+        os.remove(tmp)
+    print(f"  ПРОПУЩЕН {item['path']}: {last}", file=sys.stderr)
+    return False
 
 
 def make_cover(pdf: str, jpg: str):
@@ -140,7 +154,11 @@ def main():
         fresh = prev and prev.get("md5") == it.get("md5") and os.path.exists(abs_pdf)
         if not fresh:
             print(f"  скачиваю {it['path']}")
-            download(it, abs_pdf)
+            if not download(it, abs_pdf):
+                if prev and os.path.exists(abs_pdf):
+                    keep.update({rel_pdf, rel_jpg})
+                    groups.setdefault(group, []).append(prev)
+                continue
         if not fresh or not os.path.exists(abs_jpg):
             try:
                 make_cover(abs_pdf, abs_jpg)
