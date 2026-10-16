@@ -76,17 +76,23 @@ def main() -> None:
             )["href"]
         else:
             link = base.rstrip("/") + urllib.parse.quote(it["path"])
-        rows.append((name, link))
+        folder = it["path"].strip("/").split("/")[0] if it["path"].count("/") > 1 else "(корень)"
+        rows.append((folder, name, link))
 
-    rows.sort(key=lambda r: r[0].lower())
-    for name, link in rows:
+    rows.sort(key=lambda r: (r[0].lower(), r[1].lower()))
+    last = None
+    for folder, name, link in rows:
+        if folder != last:
+            count = sum(1 for r in rows if r[0] == folder)
+            print(f"\n=== {folder} ({count}) ===")
+            last = folder
         print(f"{name}\t{link}")
     print(f"\nВсего PDF: {len(rows)}", file=sys.stderr)
 
     out = os.path.abspath(args.csv)
     with open(out, "w", newline="", encoding="utf-8-sig") as f:
         w = csv.writer(f)
-        w.writerow(["Название", "Ссылка"])
+        w.writerow(["Папка", "Название", "Ссылка"])
         w.writerows(rows)
     print(f"Сохранено: {out}", file=sys.stderr)
 
