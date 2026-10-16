@@ -6,8 +6,13 @@
   python3 scripts/yd_pdf_list.py <ссылка на папку>  # другая папка
   python3 scripts/yd_pdf_list.py --csv путь.csv     # сохранить в другое место
   python3 scripts/yd_pdf_list.py --direct           # прямые ссылки на скачивание (временные, ~30 мин)
+  python3 scripts/yd_pdf_list.py --no-covers        # не сохранять обложки
+  python3 scripts/yd_pdf_list.py --force-covers     # перекачать обложки, которые уже есть
 
-Файл yd_pdfs.csv лежит в корне проекта только локально (он в .gitignore).
+Обложки (первая страница PDF, jpg) сохраняются в yd_covers/<папка>/<имя>.jpg в корне проекта,
+берутся из превью Яндекс Диска (сами PDF не качаются). Путь к обложке — в CSV, колонка «Обложка».
+
+Файл yd_pdfs.csv и папка yd_covers лежат в корне проекта только локально (они в .gitignore).
 
 Ссылка по умолчанию — вида https://disk.yandex.ru/d/<ключ>/<папка>/<файл>.pdf — постоянная,
 открывает файл в просмотрщике Диска. Только стандартная библиотека.
@@ -16,12 +21,17 @@ import argparse
 import csv
 import json
 import os
+import shutil
+import subprocess
+import tempfile
 import sys
 import time
 import urllib.parse
 import urllib.request
 
 API = "https://cloud-api.yandex.net/v1/disk/public/resources"
+ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
+COVERS = os.path.join(ROOT, "yd_covers")
 DEFAULT_CSV = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "yd_pdfs.csv")
 DEFAULT_KEY = "https://disk.360.yandex.ru/d/xxunmuNTZX-2Dg"
 PAGE = 100
@@ -39,11 +49,52 @@ def get(url: str) -> dict:
             time.sleep(3 * (attempt + 1))
 
 
+def save_cover(url: str, dest: str) -> bool:
+    os.makedirs(os.path.dirname(dest), exist_ok=True)
+    for attempt in range(3):
+        try:
+            with urllib.request.urlopen(url, timeout=60) as resp:
+                data = resp.read()
+            with open(dest, "wb") as f:
+                f.write(data)
+            return True
+        except Exception as exc:
+            if attempt == 2:
+                print(f"  обложка не скачалась ({dest}): {exc}", file=sys.stderr)
+                return False
+            time.sleep(2 * (attempt + 1))
+
+
+def cover_from_pdf(key: str, item: dict, dest: str) -> bool:
+    """Запасной путь, если превью Диска отдаёт 500: качаем PDF и рендерим 1-ю страницу (нужен pdftoppm)."""
+    if not shutil.which("pdftoppm"):
+        return False
+    try:
+        href = item.get("file") or get(
+            f"{API}/download?" + urllib.parse.urlencode({"public_key": key, "path": item["path"]})
+        )["href"]
+        with tempfile.TemporaryDirectory() as tmp:
+            pdf = os.path.join(tmp, "in.pdf")
+            with urllib.request.urlopen(href, timeout=120) as resp, open(pdf, "wb") as f:
+                shutil.copyfileobj(resp, f)
+            base = os.path.join(tmp, "page")
+            subprocess.run(["pdftoppm", "-jpeg", "-f", "1", "-l", "1", "-scale-to-x", "800", "-scale-to-y", "-1",
+                            pdf, base], check=True, capture_output=True)
+            out = next(os.path.join(tmp, n) for n in os.listdir(tmp) if n.startswith("page"))
+            os.makedirs(os.path.dirname(dest), exist_ok=True)
+            shutil.copyfile(out, dest)
+        return True
+    except Exception as exc:
+        print(f"  обложка из PDF не получилась ({item['name']}): {exc}", file=sys.stderr)
+        return False
+
+
 def walk(key: str, path: str = "/"):
     """Отдаёт все файлы папки рекурсивно."""
     offset = 0
     while True:
-        q = urllib.parse.urlencode({"public_key": key, "path": path, "limit": PAGE, "offset": offset})
+        q = urllib.parse.urlencode({"public_key": key, "path": path, "limit": PAGE, "offset": offset,
+                                "preview_size": "XL", "preview_crop": "false"})
         data = get(f"{API}?{q}")
         items = data.get("_embedded", {}).get("items", [])
         for it in items:
@@ -60,6 +111,8 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("key", nargs="?", default=DEFAULT_KEY, help="публичная ссылка на папку")
     ap.add_argument("--csv", default=DEFAULT_CSV, help="куда сохранить CSV (по умолчанию yd_pdfs.csv в корне проекта)")
+    ap.add_argument("--no-covers", action="store_true", help="не сохранять обложки")
+    ap.add_argument("--force-covers", action="store_true", help="перекачать уже сохранённые обложки")
     ap.add_argument("--direct", action="store_true", help="прямые ссылки на скачивание")
     args = ap.parse_args()
 
@@ -77,22 +130,31 @@ def main() -> None:
         else:
             link = base.rstrip("/") + urllib.parse.quote(it["path"])
         folder = it["path"].strip("/").split("/")[0] if it["path"].count("/") > 1 else "(корень)"
-        rows.append((folder, name, link))
+        cover = ""
+        if not args.no_covers:
+            rel = os.path.join("yd_covers", folder, os.path.splitext(name)[0] + ".jpg")
+            dest = os.path.join(ROOT, rel)
+            if (os.path.exists(dest) and not args.force_covers) \
+                    or (it.get("preview") and save_cover(it["preview"], dest)) \
+                    or cover_from_pdf(args.key, it, dest):
+                cover = rel
+        rows.append((folder, name, link, cover))
 
     rows.sort(key=lambda r: (r[0].lower(), r[1].lower()))
     last = None
-    for folder, name, link in rows:
+    for folder, name, link, _ in rows:
         if folder != last:
             count = sum(1 for r in rows if r[0] == folder)
             print(f"\n=== {folder} ({count}) ===")
             last = folder
         print(f"{name}\t{link}")
-    print(f"\nВсего PDF: {len(rows)}", file=sys.stderr)
+    got = sum(1 for r in rows if r[3])
+    print(f"\nВсего PDF: {len(rows)}, обложек: {got}", file=sys.stderr)
 
     out = os.path.abspath(args.csv)
     with open(out, "w", newline="", encoding="utf-8-sig") as f:
         w = csv.writer(f)
-        w.writerow(["Папка", "Название", "Ссылка"])
+        w.writerow(["Папка", "Название", "Ссылка", "Обложка"])
         w.writerows(rows)
     print(f"Сохранено: {out}", file=sys.stderr)
 
