@@ -17,7 +17,9 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
 import time
+import zipfile
 import urllib.parse
 import urllib.request
 
@@ -101,12 +103,53 @@ def _fetch(link: str, tmp: str, dest: str):
     os.replace(tmp, dest)
 
 
+_ZIP = {"zf": None, "tried": False}
+
+
+def _open_zip():
+    """Один раз качает всю публичную папку архивом (один запрос вместо десятков)."""
+    if _ZIP["tried"]:
+        return _ZIP["zf"]
+    _ZIP["tried"] = True
+    for attempt in range(3):
+        try:
+            link = api_get({"public_key": PUBLIC_KEY}, "/download")["href"]
+            fd, path = tempfile.mkstemp(suffix=".zip")
+            os.close(fd)
+            print("  запасной канал: скачиваю всю папку архивом…")
+            _fetch(link, path + ".part", path)
+            _ZIP["zf"] = zipfile.ZipFile(path)
+            print(f"  архив получен: {len(_ZIP['zf'].namelist())} записей")
+            return _ZIP["zf"]
+        except Exception as exc:
+            print(f"  архив: попытка {attempt + 1}/3: {exc}", file=sys.stderr)
+            time.sleep(5 * (attempt + 1))
+    return None
+
+
+def _from_zip(item: dict, dest: str):
+    zf = _open_zip()
+    if not zf:
+        return False
+    want = item["path"].strip("/").lower()
+    base = os.path.basename(want)
+    names = zf.namelist()
+    hit = next((n for n in names if n.lower().rstrip("/").endswith(want)), None)
+    if not hit:  # архив мог получить корневую папку или другое имя — ищем по имени файла
+        cands = [n for n in names if os.path.basename(n.lower()) == base]
+        hit = cands[0] if len(cands) == 1 else None
+    if not hit:
+        return False
+    with zf.open(hit) as src, open(dest, "wb") as out:
+        shutil.copyfileobj(src, out)
+    return True
+
+
 def download(item: dict, dest: str):
-    """Скачивает файл. Диск иногда отвечает 500/504, поэтому пробуем два канала:
-    прямую ссылку из листинга (item['file']) и ссылку из /download, по очереди."""
+    """Скачивает файл: прямая ссылка из листинга -> /download -> общий архив папки."""
     tmp = dest + ".part"
     last = None
-    for attempt in range(3):
+    for attempt in range(2):
         for name in ("listing", "download"):
             try:
                 if name == "listing":
@@ -119,10 +162,16 @@ def download(item: dict, dest: str):
                 return True
             except Exception as exc:
                 last = exc
-                print(f"  {name}: попытка {attempt + 1}/3 для {item['path']}: {exc}", file=sys.stderr)
-        time.sleep(4 * (attempt + 1))
+                print(f"  {name}: попытка {attempt + 1}/2 для {item['path']}: {exc}", file=sys.stderr)
+        time.sleep(3)
     if os.path.exists(tmp):
         os.remove(tmp)
+    try:
+        if _from_zip(item, dest):
+            print(f"  из архива: {item['path']}")
+            return True
+    except Exception as exc:
+        last = exc
     print(f"  ПРОПУЩЕН {item['path']} ({item.get('size', 0) // 1024} КБ): {last}", file=sys.stderr)
     return False
 
