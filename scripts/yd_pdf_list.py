@@ -6,11 +6,12 @@
   python3 scripts/yd_pdf_list.py <ссылка на папку>  # другая папка
   python3 scripts/yd_pdf_list.py --csv путь.csv     # сохранить в другое место
   python3 scripts/yd_pdf_list.py --direct           # прямые ссылки на скачивание (временные, ~30 мин)
-  python3 scripts/yd_pdf_list.py --no-covers        # не сохранять обложки
-  python3 scripts/yd_pdf_list.py --force-covers     # перекачать обложки, которые уже есть
+  python3 scripts/yd_pdf_list.py --save-covers      # ещё и сохранить картинки обложек в yd_covers/
+  python3 scripts/yd_pdf_list.py --force-covers     # (с --save-covers) перекачать уже сохранённые
 
-Обложки (первая страница PDF, jpg) сохраняются в yd_covers/<папка>/<имя>.jpg в корне проекта,
-берутся из превью Яндекс Диска (сами PDF не качаются). Путь к обложке — в CSV, колонка «Обложка».
+В списке для каждого PDF: папка, название, ссылка на сам PDF и ссылка на обложку (превью первой
+страницы с Диска). ВНИМАНИЕ: ссылки на обложки у Яндекса временные — живут около 4 часов, потом
+их нужно получить заново (запустить скрипт ещё раз). Для постоянного доступа используйте --save-covers.
 
 Файл yd_pdfs.csv и папка yd_covers лежат в корне проекта только локально (они в .gitignore).
 
@@ -111,7 +112,7 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("key", nargs="?", default=DEFAULT_KEY, help="публичная ссылка на папку")
     ap.add_argument("--csv", default=DEFAULT_CSV, help="куда сохранить CSV (по умолчанию yd_pdfs.csv в корне проекта)")
-    ap.add_argument("--no-covers", action="store_true", help="не сохранять обложки")
+    ap.add_argument("--save-covers", action="store_true", help="сохранить картинки обложек в yd_covers/")
     ap.add_argument("--force-covers", action="store_true", help="перекачать уже сохранённые обложки")
     ap.add_argument("--direct", action="store_true", help="прямые ссылки на скачивание")
     args = ap.parse_args()
@@ -130,32 +131,36 @@ def main() -> None:
         else:
             link = base.rstrip("/") + urllib.parse.quote(it["path"])
         folder = it["path"].strip("/").split("/")[0] if it["path"].count("/") > 1 else "(корень)"
+        cover_url = it.get("preview") or ""
         cover = ""
-        if not args.no_covers:
+        if args.save_covers:
             rel = os.path.join("yd_covers", folder, os.path.splitext(name)[0] + ".jpg")
             dest = os.path.join(ROOT, rel)
             if (os.path.exists(dest) and not args.force_covers) \
                     or (it.get("preview") and save_cover(it["preview"], dest)) \
                     or cover_from_pdf(args.key, it, dest):
                 cover = rel
-        rows.append((folder, name, link, cover))
+        rows.append((folder, name, link, cover_url, cover))
 
     rows.sort(key=lambda r: (r[0].lower(), r[1].lower()))
     last = None
-    for folder, name, link, _ in rows:
+    for folder, name, link, cover_url, _ in rows:
         if folder != last:
             count = sum(1 for r in rows if r[0] == folder)
             print(f"\n=== {folder} ({count}) ===")
             last = folder
-        print(f"{name}\t{link}")
+        print(f"{name}\t{link}\t{cover_url}")
     got = sum(1 for r in rows if r[3])
-    print(f"\nВсего PDF: {len(rows)}, обложек: {got}", file=sys.stderr)
+    print(f"\nВсего PDF: {len(rows)}, ссылок на обложки: {got}", file=sys.stderr)
 
     out = os.path.abspath(args.csv)
     with open(out, "w", newline="", encoding="utf-8-sig") as f:
         w = csv.writer(f)
-        w.writerow(["Папка", "Название", "Ссылка", "Обложка"])
-        w.writerows(rows)
+        head = ["Папка", "Название", "Ссылка на PDF", "Ссылка на обложку"]
+        if args.save_covers:
+            head.append("Файл обложки")
+        w.writerow(head)
+        w.writerows(r if args.save_covers else r[:4] for r in rows)
     print(f"Сохранено: {out}", file=sys.stderr)
 
 
