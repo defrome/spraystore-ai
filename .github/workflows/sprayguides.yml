@@ -1,0 +1,50 @@
+name: Синхронизация спрейгайдов
+
+on:
+  schedule:
+    - cron: "0 3 * * *"   # каждый день в 06:00 по Москве
+  workflow_dispatch:       # кнопка «Run workflow» во вкладке Actions
+
+permissions:
+  contents: write
+  pages: write
+
+concurrency:
+  group: sprayguides-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Установить pdftoppm (обложки из PDF)
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq poppler-utils
+
+      - name: Забрать PDF с Яндекс Диска
+        env:
+          YD_PUBLIC_KEY: https://disk.360.yandex.ru/d/xxunmuNTZX-2Dg
+        run: python3 scripts/sync_sprayguides.py
+
+      - name: Закоммитить изменения
+        id: commit
+        run: |
+          git config user.name "sprayguides-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add sprayguides
+          if git diff --cached --quiet; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "Изменений нет"
+          else
+            git commit -m "Обновить спрейгайды с Яндекс Диска"
+            git push
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      # пуш от GITHUB_TOKEN сам не запускает пересборку Pages — запускаем вручную
+      - name: Пересобрать GitHub Pages
+        if: steps.commit.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api -X POST "repos/${{ github.repository }}/pages/builds" || echo "Pages пересоберутся при следующем пуше"
